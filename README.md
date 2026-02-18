@@ -6,6 +6,18 @@ Weather forecast for [Even Realities G2](https://www.evenrealities.com/) smart g
 
 Five full-screen Canvas-rendered pages – 7-day forecast, current conditions, precipitation chart, wind chart and 20-hour hourly forecast – all driven by the free [Open-Meteo](https://open-meteo.com/) API with no API key required.
 
+<p>
+  <img src="screenshots/weather1.png" width="49%" />
+  <img src="screenshots/weather2.png" width="49%" />
+</p>
+<p>
+  <img src="screenshots/weather3.png" width="49%" />
+  <img src="screenshots/weather4.png" width="49%" />
+</p>
+<p>
+  <img src="screenshots/weather5.png" width="49%" />
+</p>
+
 ## System architecture
 
 ```
