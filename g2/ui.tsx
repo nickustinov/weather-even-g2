@@ -47,33 +47,33 @@ function CitySearch() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {current && (
-        <Text variant="body-2" className="text-tc-2">
+        <Text variant="body-2" style={{ color: 'var(--color-tc-2)' }}>
           Current: {current.name}, {current.country}
         </Text>
       )}
       <div>
-        <Text as="label" variant="subtitle" className="block mb-1">
+        <Text as="label" variant="subtitle" style={{ display: 'block', marginBottom: '4px' }}>
           Search city
         </Text>
         <Input
           value={query}
           onChange={handleChange}
           placeholder="Type a city name..."
-          className="w-full"
+          style={{ width: '100%' }}
         />
       </div>
       {searching && (
-        <Text variant="body-2" className="text-tc-2">Searching...</Text>
+        <Text variant="body-2" style={{ color: 'var(--color-tc-2)' }}>Searching...</Text>
       )}
       {results.length > 0 && (
-        <div className="flex flex-col gap-1">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {results.map((city, i) => (
             <Button
               key={i}
               variant="default"
-              className="w-full text-left"
+              style={{ width: '100%', textAlign: 'left' }}
               onClick={() => handleSelect(city)}
             >
               {city.name}, {city.country}
@@ -95,11 +95,11 @@ function SettingsPanel() {
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <Card className="w-full">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <Card style={{ width: '100%' }}>
         <CardHeader>
           <Text variant="title-1">City</Text>
-          <Text variant="body-2" className="text-tc-2 mt-1 block">
+          <Text variant="body-2" style={{ color: 'var(--color-tc-2)', marginTop: '4px', display: 'block' }}>
             Search and select the city for your weather forecast.
           </Text>
         </CardHeader>
@@ -107,16 +107,16 @@ function SettingsPanel() {
           <CitySearch />
         </CardContent>
       </Card>
-      <Card className="w-full">
+      <Card style={{ width: '100%' }}>
         <CardContent>
-          <Button variant="default" className="w-full" onClick={handleRefresh}>
+          <Button variant="default" style={{ width: '100%' }} onClick={handleRefresh}>
             Refresh forecast
           </Button>
         </CardContent>
       </Card>
-      <Card className="w-full">
+      <Card style={{ width: '100%' }}>
         <CardContent>
-          <Button variant="primary" className="w-full" onClick={handleConnect}>
+          <Button variant="primary" style={{ width: '100%' }} onClick={handleConnect}>
             Connect glasses
           </Button>
         </CardContent>
@@ -143,7 +143,7 @@ export function initUI(): void {
   if (status) app.appendChild(status)
 
   const container = document.createElement('div')
-  container.className = 'my-12'
+  container.style.margin = '48px 0'
   app.insertBefore(container, heading)
 
   createRoot(container).render(

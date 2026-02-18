@@ -12,10 +12,8 @@
     "@jappyjan/even-realities-ui": "^0.0.8",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "tailwindcss": "^4.1.18"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.1.18",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "typescript": "^5.9.3",
