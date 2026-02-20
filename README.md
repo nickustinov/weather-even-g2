@@ -4,19 +4,14 @@
 
 Weather forecast for [Even Realities G2](https://www.evenrealities.com/) smart glasses.
 
-Five full-screen Canvas-rendered pages – 7-day forecast, current conditions, precipitation chart, wind chart and 20-hour hourly forecast – all driven by the free [Open-Meteo](https://open-meteo.com/) API with no API key required.
+Five screens – weekly forecast, current conditions, precipitation chart, wind chart and 18-hour hourly forecast – driven by the free [Open-Meteo](https://open-meteo.com/) API with no API key required.
 
-<p>
-  <img src="screenshots/weather1.png" width="49%" />
-  <img src="screenshots/weather2.png" width="49%" />
-</p>
-<p>
-  <img src="screenshots/weather3.png" width="49%" />
-  <img src="screenshots/weather4.png" width="49%" />
-</p>
-<p>
-  <img src="screenshots/weather5.png" width="49%" />
-</p>
+Uses native text containers with aligned multi-column layouts and small image overlays (weather icons, PNG labels). All within the G2's 4-container-per-page limit and 200x100 image size constraint.
+
+![Weekly forecast](screenshots/weather1.png)
+![Current conditions](screenshots/weather2.png)
+![Precipitation](screenshots/weather3.png)
+![Wind](screenshots/weather4.png)
 
 ## System architecture
 
@@ -25,6 +20,66 @@ Five full-screen Canvas-rendered pages – 7-day forecast, current conditions, p
 ```
 
 No backend server needed. The browser calls Open-Meteo directly (free, CORS-enabled).
+
+## Screens
+
+1. **Weekly forecast** – 4 containers: header (city + temp + condition), day names column, temperatures column, conditions column
+2. **Current conditions** – 4 containers: header, labels column, values column, 100x100 weather icon image
+3. **Precipitation** – 4 containers: header (total mm), time column, horizontal bar chart (Unicode block characters), umbrella icon image
+4. **Wind** – 4 containers: header (current speed + direction), time column, horizontal bar chart, wind icon image
+5. **Hourly forecast** – 2 text containers side by side, 9 hours each (18 hours total)
+
+## Navigation
+
+| Input | Action |
+|---|---|
+| Swipe down | Next screen |
+| Swipe up | Previous screen |
+| Double tap | Refresh weather + go to first screen |
+
+## Setup
+
+```bash
+npm install
+```
+
+### Run with even-dev
+
+Requires [even-dev](https://github.com/BxNxM/even-dev) (Unified Even Hub Simulator).
+
+```bash
+# Symlink into even-dev (adjust paths to your local setup)
+ln -s /path/to/weather-even-g2/g2 /path/to/even-dev/apps/weather
+
+# Run
+cd /path/to/even-dev
+APP_NAME=weather ./start-even.sh
+```
+
+### Run standalone
+
+```bash
+npm run dev
+```
+
+### Deploy to glasses
+
+```bash
+# Terminal 1: start dev server
+npm run dev
+
+# Terminal 2: generate QR code
+npm run qr
+
+# Scan QR code with Even App on your phone
+```
+
+### Package for distribution
+
+```bash
+npm run pack
+# Creates weather.ehpk
+```
 
 ## App architecture
 
@@ -35,7 +90,7 @@ g2/
   app.ts           Thin orchestrator: initApp, refreshWeather
   state.ts         WeatherData types, app state singleton, bridge holder
   api.ts           Open-Meteo geocoding + forecast API client
-  renderer.ts      All screen rendering (5 Canvas-drawn pages)
+  renderer.ts      Screen rendering (text containers + image overlays)
   events.ts        Event normalisation + screen dispatch
   icons.ts         Canvas-based weather icon renderer (7 icon types)
   layout.ts        Display dimension constants
@@ -46,49 +101,9 @@ _shared/
   log.ts           Event log utility
 ```
 
-### Data flow
-
-`app.ts` is the entry point. On startup it fetches weather via `api.ts`, stores it in the `state.ts` singleton, and tells `renderer.ts` to paint the current screen as a full-screen Canvas image pushed to the glasses. User interactions flow through `events.ts`, which normalises raw SDK events and dispatches tap/swipe to cycle between screens. Weather auto-refreshes every 15 minutes.
-
-### Screens
-
-1. **7-day forecast** – horizontal day columns with weather icons, high/low temperatures, precipitation probability, wind speed and UV index
-2. **Current conditions** – left panel with large weather icon, temperature, city and description; right panel with 2×3 detail cards (feels like, wind, humidity, pressure, sunrise, sunset)
-3. **Precipitation** – vertical bar chart of hourly precipitation probability over 24 hours
-4. **Wind** – area chart of wind speed and gusts over 24 hours with directional arrows
-5. **Hourly forecast** – two-column list showing 20 hours with icons, temperatures, conditions and precipitation
-
-### Navigation
-
-| Input | Action |
-|---|---|
-| Tap | Next screen |
-| Swipe down | Next screen |
-| Swipe up | Previous screen |
-| Double tap | Refresh weather + go to first screen |
-
-## Setup
-
-### Run with even-dev
-
-Requires [even-dev](https://github.com/BxNxM/even-dev) (Unified Even Hub Simulator v0.0.2).
-
-```bash
-npm install
-
-# Symlink into even-dev (adjust paths to your local setup)
-ln -s /path/to/weather-even-g2/g2 /path/to/even-dev/apps/weather
-
-# Run
-cd /path/to/even-dev
-APP_NAME=weather ./start-even.sh
-```
-
-Search for a city in the browser settings panel, then click **Connect** to load the forecast on the glasses display.
-
 ## Tech stack
 
 - **Weather API:** [Open-Meteo](https://open-meteo.com/) (free, no API key)
 - **G2 frontend:** TypeScript + [Even Hub SDK](https://www.npmjs.com/package/@evenrealities/even_hub_sdk)
 - **Settings UI:** React + [@jappyjan/even-realities-ui](https://www.npmjs.com/package/@jappyjan/even-realities-ui)
-- **Build:** [Vite](https://vitejs.dev/) + [Tailwind CSS](https://tailwindcss.com/)
+- **Build:** [Vite](https://vitejs.dev/)

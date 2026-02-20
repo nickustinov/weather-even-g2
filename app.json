@@ -1,0 +1,11 @@
+{
+  "package_id": "com.nickustinov.weather",
+  "name": "Weather",
+  "version": "1.0.0",
+  "description": "Weather forecast for Even G2",
+  "author": "nickustinov",
+  "entrypoint": "index.html",
+  "permissions": {
+    "network": ["api.open-meteo.com", "geocoding-api.open-meteo.com"]
+  }
+}

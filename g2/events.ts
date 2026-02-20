@@ -70,21 +70,19 @@ export function onEvenHubEvent(event: EvenHubEvent): void {
 
   switch (eventType) {
     case OsEventTypeList.CLICK_EVENT:
-      // Tap = advance to next screen
-      nextScreen()
-      void showScreen()
+      // Tap does nothing – scroll to navigate
       break
 
     case OsEventTypeList.SCROLL_BOTTOM_EVENT:
       if (!scrollThrottled()) {
-        nextScreen()
+        prevScreen()
         void showScreen()
       }
       break
 
     case OsEventTypeList.SCROLL_TOP_EVENT:
       if (!scrollThrottled()) {
-        prevScreen()
+        nextScreen()
         void showScreen()
       }
       break

@@ -61,7 +61,7 @@ function CitySearch() {
           value={query}
           onChange={handleChange}
           placeholder="Type a city name..."
-          style={{ width: '100%' }}
+          style={{ width: '90%' }}
         />
       </div>
       {searching && (
