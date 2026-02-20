@@ -8,6 +8,12 @@ Five screens – weekly forecast, current conditions, precipitation chart, wind 
 
 Uses native text containers with aligned multi-column layouts and small image overlays (weather icons, PNG labels). All within the G2's 4-container-per-page limit and 200x100 image size constraint.
 
+### Try it now
+
+Scan this QR code in the Even Realities app (Even Hub page) to use on your G2 glasses:
+
+<img src="qr.png" width="200" />
+
 ![Weekly forecast](screenshots/weather1.png)
 ![Current conditions](screenshots/weather2.png)
 ![Precipitation](screenshots/weather3.png)
