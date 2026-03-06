@@ -111,5 +111,5 @@ _shared/
 
 - **Weather API:** [Open-Meteo](https://open-meteo.com/) (free, no API key)
 - **G2 frontend:** TypeScript + [Even Hub SDK](https://www.npmjs.com/package/@evenrealities/even_hub_sdk)
-- **Settings UI:** React + [@jappyjan/even-realities-ui](https://www.npmjs.com/package/@jappyjan/even-realities-ui)
+- **Settings UI:** React + [shadcn/ui](https://ui.shadcn.com/) + Tailwind CSS
 - **Build:** [Vite](https://vitejs.dev/)

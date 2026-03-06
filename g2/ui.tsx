@@ -1,14 +1,10 @@
 import React, { useState, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
-import {
-  Card,
-  CardHeader,
-  CardContent,
-  Text,
-  Input,
-  Button,
-  Radio,
-} from '@jappyjan/even-realities-ui'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { searchCities, getSavedCity, saveCity, getSavedUnit, saveUnit } from './api'
 import { refreshWeather } from './app'
 import type { City, TemperatureUnit } from './state'
@@ -24,7 +20,6 @@ function CitySearch() {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<City[]>([])
   const [current, setCurrent] = useState<City | null>(getSavedCity())
-  const [searching, setSearching] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -39,10 +34,8 @@ function CitySearch() {
     }
 
     timerRef.current = setTimeout(async () => {
-      setSearching(true)
       const cities = await searchCities(value)
       setResults(cities)
-      setSearching(false)
     }, 300)
   }
 
@@ -55,33 +48,29 @@ function CitySearch() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div className="flex flex-col gap-4">
       {current && (
-        <Text variant="body-2" style={{ color: 'var(--color-tc-2)' }}>
+        <p className="text-sm text-muted-foreground">
           Current: {cityLabel(current)}
-        </Text>
+        </p>
       )}
       <div>
-        <Text as="label" variant="subtitle" style={{ display: 'block', marginBottom: '4px' }}>
-          Search city
-        </Text>
+        <Label htmlFor="city-search">Search city</Label>
         <Input
+          id="city-search"
           value={query}
           onChange={handleChange}
           placeholder="Type a city name..."
-          style={{ width: '90%' }}
+          className="mt-1.5"
         />
       </div>
-      {searching && (
-        <Text variant="body-2" style={{ color: 'var(--color-tc-2)' }}>Searching...</Text>
-      )}
       {results.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <div className="flex flex-col gap-1.5">
           {results.map((city, i) => (
             <Button
               key={i}
-              variant="default"
-              style={{ width: '100%', textAlign: 'left' }}
+              variant="outline"
+              className="w-full justify-start"
               onClick={() => handleSelect(city)}
             >
               {cityLabel(city)}
@@ -96,73 +85,57 @@ function CitySearch() {
 function UnitPicker() {
   const [unit, setUnit] = useState<TemperatureUnit>(getSavedUnit())
 
-  const handleChange = (value: TemperatureUnit) => {
-    setUnit(value)
-    saveUnit(value)
+  const handleChange = (value: string) => {
+    const v = value as TemperatureUnit
+    setUnit(v)
+    saveUnit(v)
     void refreshWeather()
   }
 
   return (
-    <div style={{ display: 'flex', gap: '16px' }}>
-      <Radio
-        name="unit"
-        value="celsius"
-        label="°C"
-        checked={unit === 'celsius'}
-        onChange={() => handleChange('celsius')}
-      />
-      <Radio
-        name="unit"
-        value="fahrenheit"
-        label="°F"
-        checked={unit === 'fahrenheit'}
-        onChange={() => handleChange('fahrenheit')}
-      />
-    </div>
+    <RadioGroup value={unit} onValueChange={handleChange} className="flex gap-6">
+      <div className="flex items-center gap-2">
+        <RadioGroupItem value="celsius" id="unit-c" />
+        <Label htmlFor="unit-c">°C</Label>
+      </div>
+      <div className="flex items-center gap-2">
+        <RadioGroupItem value="fahrenheit" id="unit-f" />
+        <Label htmlFor="unit-f">°F</Label>
+      </div>
+    </RadioGroup>
   )
 }
 
 function SettingsPanel() {
-  const handleRefresh = () => {
-    void refreshWeather()
-  }
-
-  const handleConnect = () => {
-    document.getElementById('connectBtn')?.click()
-  }
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-      <Card style={{ width: '100%' }}>
+    <div className="flex flex-col gap-4 max-w-md mx-auto p-4">
+      <h1 className="text-xl font-semibold">Settings</h1>
+      <Card>
         <CardHeader>
-          <Text variant="title-1">City</Text>
-          <Text variant="body-2" style={{ color: 'var(--color-tc-2)', marginTop: '4px', display: 'block' }}>
+          <CardTitle>City</CardTitle>
+          <CardDescription>
             Search and select the city for your weather forecast.
-          </Text>
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <CitySearch />
         </CardContent>
       </Card>
-      <Card style={{ width: '100%' }}>
+      <Card>
         <CardHeader>
-          <Text variant="title-1">Temperature unit</Text>
+          <CardTitle>Temperature unit</CardTitle>
         </CardHeader>
         <CardContent>
           <UnitPicker />
         </CardContent>
       </Card>
-      <Card style={{ width: '100%' }}>
-        <CardContent>
-          <Button variant="default" style={{ width: '100%' }} onClick={handleRefresh}>
-            Refresh forecast
-          </Button>
-        </CardContent>
-      </Card>
-      <Card style={{ width: '100%' }}>
-        <CardContent>
-          <Button variant="primary" style={{ width: '100%' }} onClick={handleConnect}>
+      <Card>
+        <CardContent className="flex flex-col gap-3">
+          <Button className="w-full" onClick={() => document.getElementById('connectBtn')?.click()}>
             Connect glasses
+          </Button>
+          <Button variant="outline" className="w-full" onClick={() => void refreshWeather()}>
+            Refresh forecast
           </Button>
         </CardContent>
       </Card>
@@ -183,13 +156,13 @@ export function initUI(): void {
   if (connectBtn) connectBtn.style.display = 'none'
 
   const heading = app.querySelector('h1')
+  if (heading) heading.remove()
+
   const status = document.getElementById('status')
-  if (heading) app.appendChild(heading)
-  if (status) app.appendChild(status)
+  if (status) status.remove()
 
   const container = document.createElement('div')
-  container.style.margin = '48px 0'
-  app.insertBefore(container, heading)
+  app.appendChild(container)
 
   createRoot(container).render(
     <React.StrictMode>
