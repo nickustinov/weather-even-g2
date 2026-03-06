@@ -1,6 +1,7 @@
-import type { City, WeatherData, HourlyPoint, DailyPoint } from './state'
+import type { City, TemperatureUnit, WeatherData, HourlyPoint, DailyPoint } from './state'
 
 const CITY_KEY = 'weather:city'
+const UNIT_KEY = 'weather:unit'
 
 export function getSavedCity(): City | null {
   const raw = localStorage.getItem(CITY_KEY)
@@ -16,6 +17,15 @@ export function saveCity(city: City): void {
   localStorage.setItem(CITY_KEY, JSON.stringify(city))
 }
 
+export function getSavedUnit(): TemperatureUnit {
+  const raw = localStorage.getItem(UNIT_KEY)
+  return raw === 'fahrenheit' ? 'fahrenheit' : 'celsius'
+}
+
+export function saveUnit(unit: TemperatureUnit): void {
+  localStorage.setItem(UNIT_KEY, unit)
+}
+
 export async function searchCities(query: string): Promise<City[]> {
   if (query.length < 2) return []
 
@@ -24,11 +34,12 @@ export async function searchCities(query: string): Promise<City[]> {
   if (!res.ok) return []
 
   const data = (await res.json()) as {
-    results?: Array<{ name: string; country?: string; latitude: number; longitude: number }>
+    results?: Array<{ name: string; admin1?: string; country?: string; latitude: number; longitude: number }>
   }
 
   return (data.results ?? []).map((r) => ({
     name: r.name,
+    admin1: r.admin1 ?? '',
     country: r.country ?? '',
     latitude: r.latitude,
     longitude: r.longitude,
@@ -95,7 +106,7 @@ type OpenMeteoForecast = {
   }
 }
 
-export async function fetchWeather(city: City): Promise<WeatherData> {
+export async function fetchWeather(city: City, unit: TemperatureUnit = 'celsius'): Promise<WeatherData> {
   const params = new URLSearchParams({
     latitude: String(city.latitude),
     longitude: String(city.longitude),
@@ -106,6 +117,7 @@ export async function fetchWeather(city: City): Promise<WeatherData> {
       'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,wind_speed_10m_max,uv_index_max,sunshine_duration,sunrise,sunset',
     timezone: 'auto',
     forecast_days: '7',
+    temperature_unit: unit,
   })
 
   const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`)

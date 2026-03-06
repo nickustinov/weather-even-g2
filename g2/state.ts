@@ -1,7 +1,10 @@
 import type { EvenAppBridge } from '@evenrealities/even_hub_sdk'
 
+export type TemperatureUnit = 'celsius' | 'fahrenheit'
+
 export type City = {
   name: string
+  admin1: string
   country: string
   latitude: number
   longitude: number

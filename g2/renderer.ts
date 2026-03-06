@@ -81,7 +81,7 @@ async function sendImage(bytes: number[], containerID: number, containerName: st
 // Screen 0 – 7-day forecast (text + icon overlay)
 // ---------------------------------------------------------------------------
 
-const HEADER_H = 36
+const HEADER_H = 50
 const COL_Y = HEADER_H
 const COL_H = DISPLAY_HEIGHT - COL_Y
 const DAY_COL_W = 120

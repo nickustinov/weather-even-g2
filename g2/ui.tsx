@@ -7,10 +7,18 @@ import {
   Text,
   Input,
   Button,
+  Radio,
 } from '@jappyjan/even-realities-ui'
-import { searchCities, getSavedCity, saveCity } from './api'
+import { searchCities, getSavedCity, saveCity, getSavedUnit, saveUnit } from './api'
 import { refreshWeather } from './app'
-import type { City } from './state'
+import type { City, TemperatureUnit } from './state'
+
+function cityLabel(city: City): string {
+  const parts = [city.name]
+  if (city.admin1) parts.push(city.admin1)
+  parts.push(city.country)
+  return parts.join(', ')
+}
 
 function CitySearch() {
   const [query, setQuery] = useState('')
@@ -50,7 +58,7 @@ function CitySearch() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {current && (
         <Text variant="body-2" style={{ color: 'var(--color-tc-2)' }}>
-          Current: {current.name}, {current.country}
+          Current: {cityLabel(current)}
         </Text>
       )}
       <div>
@@ -76,11 +84,40 @@ function CitySearch() {
               style={{ width: '100%', textAlign: 'left' }}
               onClick={() => handleSelect(city)}
             >
-              {city.name}, {city.country}
+              {cityLabel(city)}
             </Button>
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function UnitPicker() {
+  const [unit, setUnit] = useState<TemperatureUnit>(getSavedUnit())
+
+  const handleChange = (value: TemperatureUnit) => {
+    setUnit(value)
+    saveUnit(value)
+    void refreshWeather()
+  }
+
+  return (
+    <div style={{ display: 'flex', gap: '16px' }}>
+      <Radio
+        name="unit"
+        value="celsius"
+        label="°C"
+        checked={unit === 'celsius'}
+        onChange={() => handleChange('celsius')}
+      />
+      <Radio
+        name="unit"
+        value="fahrenheit"
+        label="°F"
+        checked={unit === 'fahrenheit'}
+        onChange={() => handleChange('fahrenheit')}
+      />
     </div>
   )
 }
@@ -105,6 +142,14 @@ function SettingsPanel() {
         </CardHeader>
         <CardContent>
           <CitySearch />
+        </CardContent>
+      </Card>
+      <Card style={{ width: '100%' }}>
+        <CardHeader>
+          <Text variant="title-1">Temperature unit</Text>
+        </CardHeader>
+        <CardContent>
+          <UnitPicker />
         </CardContent>
       </Card>
       <Card style={{ width: '100%' }}>
