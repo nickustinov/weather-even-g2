@@ -1,13 +1,63 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { searchCities, getSavedCity, saveCity, getSavedUnit, saveUnit } from './api'
 import { refreshWeather } from './app'
 import type { City, TemperatureUnit } from './state'
+
+/* ── shared styles ─────────────────────────────────────── */
+
+const cardStyle: React.CSSProperties = {
+  background: 'var(--color-surface)',
+  borderRadius: 'var(--radius-default)',
+  padding: 'var(--spacing-card-margin)',
+}
+
+const inputStyle: React.CSSProperties = {
+  height: 36,
+  width: '100%',
+  background: 'var(--color-input-bg)',
+  color: 'var(--color-text)',
+  border: 'none',
+  borderRadius: 'var(--radius-default)',
+  padding: '0 16px',
+  fontFamily: 'var(--font-body)',
+  outline: 'none',
+}
+
+const resultBtnStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  width: '100%',
+  height: 40,
+  border: '1px solid var(--color-border)',
+  borderRadius: 'var(--radius-default)',
+  background: 'transparent',
+  color: 'var(--color-text)',
+  fontFamily: 'var(--font-body)',
+  padding: '0 16px',
+  cursor: 'pointer',
+  textAlign: 'left' as const,
+}
+
+const actionBtnStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: '100%',
+  height: 48,
+  border: 'none',
+  borderRadius: 'var(--radius-default)',
+  background: 'var(--color-surface)',
+  color: 'var(--color-text)',
+  fontFamily: 'var(--font-body)',
+  cursor: 'pointer',
+}
+
+/* ── helpers ────────────────────────────────────────────── */
+
+function autoConnect() {
+  document.getElementById('connectBtn')?.click()
+}
 
 function cityLabel(city: City): string {
   const parts = [city.name]
@@ -16,65 +66,59 @@ function cityLabel(city: City): string {
   return parts.join(', ')
 }
 
+/* ── components ─────────────────────────────────────────── */
+
 function CitySearch() {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<City[]>([])
   const [current, setCurrent] = useState<City | null>(getSavedCity())
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
+  useEffect(() => {
+    if (current) autoConnect()
+  }, [])
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
     setQuery(value)
-
     if (timerRef.current) clearTimeout(timerRef.current)
-
-    if (value.length < 2) {
-      setResults([])
-      return
-    }
-
+    if (value.length < 2) { setResults([]); return }
     timerRef.current = setTimeout(async () => {
-      const cities = await searchCities(value)
-      setResults(cities)
+      setResults(await searchCities(value))
     }, 300)
   }
 
   const handleSelect = (city: City) => {
+    if (timerRef.current) clearTimeout(timerRef.current)
     saveCity(city)
     setCurrent(city)
     setQuery('')
     setResults([])
     void refreshWeather()
+    autoConnect()
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div style={cardStyle}>
       {current && (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-subtitle" style={{ color: 'var(--color-text-dim)', margin: 0 }}>
           Current: {cityLabel(current)}
         </p>
       )}
-      <div>
-        <Label htmlFor="city-search">Search city</Label>
-        <Input
-          id="city-search"
-          value={query}
-          onChange={handleChange}
-          placeholder="Type a city name..."
-          className="mt-1.5"
-        />
-      </div>
+      <input
+        id="city-search"
+        className="text-medium-body"
+        style={{ ...inputStyle, marginTop: current ? 'var(--spacing-cross)' : 0 }}
+        value={query}
+        onChange={handleChange}
+        placeholder="Search city..."
+      />
       {results.length > 0 && (
-        <div className="flex flex-col gap-1.5">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-same)', marginTop: 'var(--spacing-cross)' }}>
           {results.map((city, i) => (
-            <Button
-              key={i}
-              variant="outline"
-              className="w-full justify-start"
-              onClick={() => handleSelect(city)}
-            >
+            <button key={i} className="text-normal-body" style={resultBtnStyle} onClick={() => handleSelect(city)}>
               {cityLabel(city)}
-            </Button>
+            </button>
           ))}
         </div>
       )}
@@ -85,60 +129,56 @@ function CitySearch() {
 function UnitPicker() {
   const [unit, setUnit] = useState<TemperatureUnit>(getSavedUnit())
 
-  const handleChange = (value: string) => {
-    const v = value as TemperatureUnit
-    setUnit(v)
-    saveUnit(v)
+  const handleChange = (value: TemperatureUnit) => {
+    setUnit(value)
+    saveUnit(value)
     void refreshWeather()
   }
 
+  const dot = (active: boolean): React.CSSProperties => ({
+    width: 16,
+    height: 16,
+    borderRadius: '50%',
+    border: `2px solid ${active ? 'var(--color-accent)' : 'var(--color-border)'}`,
+    background: active ? 'var(--color-accent)' : 'transparent',
+    flexShrink: 0,
+  })
+
   return (
-    <RadioGroup value={unit} onValueChange={handleChange} className="flex gap-6">
-      <div className="flex items-center gap-2">
-        <RadioGroupItem value="celsius" id="unit-c" />
-        <Label htmlFor="unit-c">°C</Label>
+    <div style={cardStyle}>
+      <div style={{ display: 'flex', gap: 'var(--spacing-section)' }}>
+        {(['celsius', 'fahrenheit'] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => handleChange(v)}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+          >
+            <span style={dot(unit === v)} />
+            <span className="text-medium-body">{v === 'celsius' ? '°C' : '°F'}</span>
+          </button>
+        ))}
       </div>
-      <div className="flex items-center gap-2">
-        <RadioGroupItem value="fahrenheit" id="unit-f" />
-        <Label htmlFor="unit-f">°F</Label>
-      </div>
-    </RadioGroup>
+    </div>
   )
 }
 
 function SettingsPanel() {
   return (
-    <div className="flex flex-col gap-4 max-w-md mx-auto p-4">
-      <h1 className="text-xl font-semibold">Settings</h1>
-      <Card>
-        <CardHeader>
-          <CardTitle>City</CardTitle>
-          <CardDescription>
-            Search and select the city for your weather forecast.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <CitySearch />
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Temperature unit</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <UnitPicker />
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="flex flex-col gap-3">
-          <Button className="w-full" onClick={() => document.getElementById('connectBtn')?.click()}>
-            Connect glasses
-          </Button>
-          <Button variant="outline" className="w-full" onClick={() => void refreshWeather()}>
-            Refresh forecast
-          </Button>
-        </CardContent>
-      </Card>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <span className="text-subtitle" style={{ color: 'var(--color-text-dim)', marginBottom: 'var(--spacing-same)' }}>City</span>
+      <CitySearch />
+
+      <span className="text-subtitle" style={{ color: 'var(--color-text-dim)', marginTop: 'var(--spacing-section)', marginBottom: 'var(--spacing-same)' }}>Temperature</span>
+      <UnitPicker />
+
+      <button
+        className="text-medium-title"
+        style={{ ...actionBtnStyle, marginTop: 'var(--spacing-section)' }}
+        onClick={() => void refreshWeather()}
+      >
+        Refresh forecast
+      </button>
     </div>
   )
 }
