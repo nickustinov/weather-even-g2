@@ -1,11 +1,20 @@
 {
-  "package_id": "com.nickustinov.weather",
+  "package_id": "com.nickustinov.weatherapp",
   "name": "Weather",
   "version": "1.0.0",
+  "edition": "202601",
   "description": "Weather forecast for Even G2",
+  "tagline": "Current weather and forecasts on your glasses",
   "author": "nickustinov",
   "entrypoint": "index.html",
-  "permissions": {
-    "network": ["api.open-meteo.com", "geocoding-api.open-meteo.com"]
-  }
+  "min_app_version": "0.1.0",
+  "min_sdk_version": "0.0.9",
+  "supported_languages": ["en"],
+  "permissions": [
+    {
+      "name": "network",
+      "desc": "Fetches weather data from API.",
+      "whitelist": ["api.open-meteo.com", "geocoding-api.open-meteo.com"]
+    }
+  ]
 }
