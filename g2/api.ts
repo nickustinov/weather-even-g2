@@ -1,29 +1,46 @@
+import type { EvenAppBridge } from '@evenrealities/even_hub_sdk'
 import type { City, TemperatureUnit, WeatherData, HourlyPoint, DailyPoint } from './state'
+import { bridge } from './state'
 
 const CITY_KEY = 'weather:city'
 const UNIT_KEY = 'weather:unit'
 
-export function getSavedCity(): City | null {
-  const raw = localStorage.getItem(CITY_KEY)
-  if (!raw) return null
-  try {
-    return JSON.parse(raw) as City
-  } catch {
-    return null
+// --- Settings (SDK local storage + memory cache) ---
+
+let cachedCity: City | null = null
+let cachedUnit: TemperatureUnit = 'celsius'
+const settingsListeners: Array<() => void> = []
+
+export function onSettingsLoaded(cb: () => void): void {
+  settingsListeners.push(cb)
+}
+
+export async function loadSettings(b: EvenAppBridge): Promise<void> {
+  const rawCity = await b.getLocalStorage(CITY_KEY)
+  if (rawCity) {
+    try { cachedCity = JSON.parse(rawCity) as City } catch { /* ignore */ }
   }
+  const rawUnit = await b.getLocalStorage(UNIT_KEY)
+  cachedUnit = rawUnit === 'fahrenheit' ? 'fahrenheit' : 'celsius'
+  for (const cb of settingsListeners) cb()
+}
+
+export function getSavedCity(): City | null {
+  return cachedCity
 }
 
 export function saveCity(city: City): void {
-  localStorage.setItem(CITY_KEY, JSON.stringify(city))
+  cachedCity = city
+  if (bridge) void bridge.setLocalStorage(CITY_KEY, JSON.stringify(city))
 }
 
 export function getSavedUnit(): TemperatureUnit {
-  const raw = localStorage.getItem(UNIT_KEY)
-  return raw === 'fahrenheit' ? 'fahrenheit' : 'celsius'
+  return cachedUnit
 }
 
 export function saveUnit(unit: TemperatureUnit): void {
-  localStorage.setItem(UNIT_KEY, unit)
+  cachedUnit = unit
+  if (bridge) void bridge.setLocalStorage(UNIT_KEY, unit)
 }
 
 export async function searchCities(query: string): Promise<City[]> {

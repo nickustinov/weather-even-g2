@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
-import { searchCities, getSavedCity, saveCity, getSavedUnit, saveUnit } from './api'
+import { searchCities, getSavedCity, saveCity, getSavedUnit, saveUnit, onSettingsLoaded } from './api'
 import { refreshWeather } from './app'
 import type { City, TemperatureUnit } from './state'
 
@@ -76,6 +76,9 @@ function CitySearch() {
 
   useEffect(() => {
     if (current) autoConnect()
+    onSettingsLoaded(() => {
+      setCurrent(getSavedCity())
+    })
   }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -128,6 +131,10 @@ function CitySearch() {
 
 function UnitPicker() {
   const [unit, setUnit] = useState<TemperatureUnit>(getSavedUnit())
+
+  useEffect(() => {
+    onSettingsLoaded(() => setUnit(getSavedUnit()))
+  }, [])
 
   const handleChange = (value: TemperatureUnit) => {
     setUnit(value)
