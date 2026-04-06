@@ -1,6 +1,6 @@
 import type { EvenAppBridge } from '@evenrealities/even_hub_sdk'
 
-export type TemperatureUnit = 'celsius' | 'fahrenheit'
+export type UnitSystem = 'metric' | 'imperial'
 
 export type City = {
   name: string
@@ -66,8 +66,12 @@ export const state: State = {
   weather: null,
 }
 
-export let bridge: EvenAppBridge | null = null
+let _bridge: EvenAppBridge | null = null
+
+export function getBridge(): EvenAppBridge | null {
+  return _bridge
+}
 
 export function setBridge(b: EvenAppBridge): void {
-  bridge = b
+  _bridge = b
 }

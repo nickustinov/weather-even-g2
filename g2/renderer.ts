@@ -7,8 +7,9 @@ import {
 } from '@evenrealities/even_hub_sdk'
 import { appendEventLog } from '../_shared/log'
 import { DISPLAY_WIDTH, DISPLAY_HEIGHT } from './layout'
-import { state, bridge, SCREENS } from './state'
+import { state, getBridge, SCREENS } from './state'
 import type { WeatherData } from './state'
+import { getSavedUnit } from './api'
 import { drawWeatherIconAt, canvasToBytes } from './icons'
 import umbrellaUrl from './assets/umbrella.png'
 import windIconUrl from './assets/wind.png'
@@ -22,13 +23,14 @@ async function rebuildPage(config: {
   textObject?: TextContainerProperty[]
   imageObject?: ImageContainerProperty[]
 }): Promise<void> {
-  if (!bridge) return
+  const b = getBridge()
+  if (!b) return
   if (!state.startupRendered) {
-    await bridge.createStartUpPageContainer(new CreateStartUpPageContainer(config))
+    await b.createStartUpPageContainer(new CreateStartUpPageContainer(config))
     state.startupRendered = true
     return
   }
-  await bridge.rebuildPageContainer(new RebuildPageContainer(config))
+  await b.rebuildPageContainer(new RebuildPageContainer(config))
 }
 
 // ---------------------------------------------------------------------------
@@ -70,8 +72,9 @@ function drawWeatherIcon(wmoCode: number, size: number): number[] {
 }
 
 async function sendImage(bytes: number[], containerID: number, containerName: string): Promise<void> {
-  if (!bridge) return
-  const result = await bridge.updateImageRawData(
+  const b = getBridge()
+  if (!b) return
+  const result = await b.updateImageRawData(
     new ImageRawDataUpdate({ containerID, containerName, imageData: bytes }),
   )
   appendEventLog(`Image: ${String(result)}`)
@@ -173,6 +176,21 @@ const NOW_ICON_PADDING_RIGHT = 20
 const NOW_LABEL_W = 120
 const NOW_VALUE_W = 300
 
+function speedUnit(): string {
+  return getSavedUnit() === 'imperial' ? 'mph' : 'km/h'
+}
+
+function precipUnit(): string {
+  return getSavedUnit() === 'imperial' ? 'in' : 'mm'
+}
+
+function formatPressure(hPa: number): string {
+  if (getSavedUnit() === 'imperial') {
+    return `${(hPa * 0.02953).toFixed(2)} inHg`
+  }
+  return `${hPa} hPa`
+}
+
 function nowLabels(): string {
   return ['Feels like', 'Wind', 'Humidity', 'Pressure', '', 'Sunrise', 'Sunset'].join('\n')
 }
@@ -180,9 +198,9 @@ function nowLabels(): string {
 function nowValues(w: WeatherData): string {
   return [
     `${w.feelsLike}\u00B0`,
-    `${w.windSpeed} km/h ${windLabel(w.windDirection)}`,
+    `${w.windSpeed} ${speedUnit()} ${windLabel(w.windDirection)}`,
     `${w.humidity}%`,
-    `${w.pressure} hPa`,
+    formatPressure(w.pressure),
     '',
     w.sunrise,
     w.sunset,
@@ -318,7 +336,7 @@ async function showRainScreen(w: WeatherData): Promise<void> {
       new TextContainerProperty({
         containerID: 1,
         containerName: 'header',
-        content: `Precipitation \u00B7 ${Math.round(totalMm * 10) / 10} mm next 12h`,
+        content: `Precipitation \u00B7 ${Math.round(totalMm * 10) / 10} ${precipUnit()} next 12h`,
         xPosition: 0,
         yPosition: 0,
         width: DISPLAY_WIDTH,
@@ -379,7 +397,7 @@ async function showWindScreen(w: WeatherData): Promise<void> {
       new TextContainerProperty({
         containerID: 1,
         containerName: 'header',
-        content: `Wind \u00B7 ${w.windSpeed} km/h ${windLabel(w.windDirection)}`,
+        content: `Wind \u00B7 ${w.windSpeed} ${speedUnit()} ${windLabel(w.windDirection)}`,
         xPosition: 0,
         yPosition: 0,
         width: DISPLAY_WIDTH,

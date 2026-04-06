@@ -1,6 +1,7 @@
 import type { EvenAppBridge } from '@evenrealities/even_hub_sdk'
-import type { City, TemperatureUnit, WeatherData, HourlyPoint, DailyPoint } from './state'
-import { bridge } from './state'
+import type { City, UnitSystem, WeatherData, HourlyPoint, DailyPoint } from './state'
+import { getBridge } from './state'
+import { appendEventLog } from '../_shared/log'
 
 const CITY_KEY = 'weather:city'
 const UNIT_KEY = 'weather:unit'
@@ -8,7 +9,7 @@ const UNIT_KEY = 'weather:unit'
 // --- Settings (SDK local storage + memory cache) ---
 
 let cachedCity: City | null = null
-let cachedUnit: TemperatureUnit = 'celsius'
+let cachedUnit: UnitSystem = 'metric'
 const settingsListeners: Array<() => void> = []
 
 export function onSettingsLoaded(cb: () => void): void {
@@ -19,9 +20,23 @@ export async function loadSettings(b: EvenAppBridge): Promise<void> {
   const rawCity = await b.getLocalStorage(CITY_KEY)
   if (rawCity) {
     try { cachedCity = JSON.parse(rawCity) as City } catch { /* ignore */ }
+    appendEventLog(`Settings: loaded city=${cachedCity?.name} from SDK`)
+  } else if (cachedCity) {
+    const ok = await b.setLocalStorage(CITY_KEY, JSON.stringify(cachedCity))
+    appendEventLog(`Settings: synced city=${cachedCity.name} to SDK, ok=${ok}`)
+    // Verify it actually persisted
+    const verify = await b.getLocalStorage(CITY_KEY)
+    appendEventLog(`Settings: verify city readback=${verify ? 'ok' : 'empty'}`)
   }
+
   const rawUnit = await b.getLocalStorage(UNIT_KEY)
-  cachedUnit = rawUnit === 'fahrenheit' ? 'fahrenheit' : 'celsius'
+  if (rawUnit) {
+    cachedUnit = rawUnit === 'imperial' ? 'imperial' : 'metric'
+  } else if (cachedUnit !== 'metric') {
+    await b.setLocalStorage(UNIT_KEY, cachedUnit)
+  }
+
+  appendEventLog(`Settings: city=${cachedCity?.name ?? 'none'} unit=${cachedUnit}`)
   for (const cb of settingsListeners) cb()
 }
 
@@ -31,16 +46,19 @@ export function getSavedCity(): City | null {
 
 export function saveCity(city: City): void {
   cachedCity = city
-  if (bridge) void bridge.setLocalStorage(CITY_KEY, JSON.stringify(city))
+  const b = getBridge()
+  if (b) void b.setLocalStorage(CITY_KEY, JSON.stringify(city))
 }
 
-export function getSavedUnit(): TemperatureUnit {
+export function getSavedUnit(): UnitSystem {
   return cachedUnit
 }
 
-export function saveUnit(unit: TemperatureUnit): void {
+export function saveUnit(unit: UnitSystem): void {
   cachedUnit = unit
-  if (bridge) void bridge.setLocalStorage(UNIT_KEY, unit)
+  const b = getBridge()
+  if (b) void b.setLocalStorage(UNIT_KEY, unit)
+  // If bridge not ready, loadSettings() will sync on connect
 }
 
 export async function searchCities(query: string): Promise<City[]> {
@@ -123,7 +141,8 @@ type OpenMeteoForecast = {
   }
 }
 
-export async function fetchWeather(city: City, unit: TemperatureUnit = 'celsius'): Promise<WeatherData> {
+export async function fetchWeather(city: City, unit: UnitSystem = 'metric'): Promise<WeatherData> {
+  const imperial = unit === 'imperial'
   const params = new URLSearchParams({
     latitude: String(city.latitude),
     longitude: String(city.longitude),
@@ -134,7 +153,9 @@ export async function fetchWeather(city: City, unit: TemperatureUnit = 'celsius'
       'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,wind_speed_10m_max,uv_index_max,sunshine_duration,sunrise,sunset',
     timezone: 'auto',
     forecast_days: '7',
-    temperature_unit: unit,
+    temperature_unit: imperial ? 'fahrenheit' : 'celsius',
+    wind_speed_unit: imperial ? 'mph' : 'kmh',
+    precipitation_unit: imperial ? 'inch' : 'mm',
   })
 
   const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`)

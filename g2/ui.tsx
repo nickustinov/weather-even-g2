@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { searchCities, getSavedCity, saveCity, getSavedUnit, saveUnit, onSettingsLoaded } from './api'
 import { refreshWeather } from './app'
-import type { City, TemperatureUnit } from './state'
+import type { City, UnitSystem } from './state'
 
 /* ── shared styles ─────────────────────────────────────── */
 
@@ -129,42 +129,41 @@ function CitySearch() {
   )
 }
 
+const toggleStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  borderRadius: 'var(--radius-default)',
+  overflow: 'hidden',
+  border: '1px solid var(--color-border, #333)',
+}
+
+const toggleBtnStyle = (active: boolean): React.CSSProperties => ({
+  padding: '6px 16px',
+  border: 'none',
+  cursor: 'pointer',
+  fontFamily: 'var(--font-body)',
+  fontSize: 14,
+  background: active ? 'var(--color-accent, #007AFF)' : 'var(--color-input-bg, #2a2a2a)',
+  color: active ? 'var(--color-text-highlight, #fff)' : 'var(--color-text-dim, #888)',
+})
+
 function UnitPicker() {
-  const [unit, setUnit] = useState<TemperatureUnit>(getSavedUnit())
+  const [unit, setUnit] = useState<UnitSystem>(getSavedUnit())
 
   useEffect(() => {
     onSettingsLoaded(() => setUnit(getSavedUnit()))
   }, [])
 
-  const handleChange = (value: TemperatureUnit) => {
+  const handleChange = (value: UnitSystem) => {
     setUnit(value)
     saveUnit(value)
     void refreshWeather()
   }
 
-  const dot = (active: boolean): React.CSSProperties => ({
-    width: 16,
-    height: 16,
-    borderRadius: '50%',
-    border: `2px solid ${active ? 'var(--color-accent)' : 'var(--color-border)'}`,
-    background: active ? 'var(--color-accent)' : 'transparent',
-    flexShrink: 0,
-  })
-
   return (
     <div style={cardStyle}>
-      <div style={{ display: 'flex', gap: 'var(--spacing-section)' }}>
-        {(['celsius', 'fahrenheit'] as const).map((v) => (
-          <button
-            key={v}
-            type="button"
-            onClick={() => handleChange(v)}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-          >
-            <span style={dot(unit === v)} />
-            <span className="text-medium-body">{v === 'celsius' ? '°C' : '°F'}</span>
-          </button>
-        ))}
+      <div style={toggleStyle}>
+        <button style={toggleBtnStyle(unit === 'metric')} onClick={() => handleChange('metric')}>Metric</button>
+        <button style={toggleBtnStyle(unit === 'imperial')} onClick={() => handleChange('imperial')}>Imperial</button>
       </div>
     </div>
   )
@@ -173,10 +172,10 @@ function UnitPicker() {
 function SettingsPanel() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      <span className="text-subtitle" style={{ color: 'var(--color-text-dim)', marginBottom: 'var(--spacing-same)' }}>City</span>
+      <h2 className="text-large-title" style={{ margin: `0 0 var(--spacing-cross)` }}>City</h2>
       <CitySearch />
 
-      <span className="text-subtitle" style={{ color: 'var(--color-text-dim)', marginTop: 'var(--spacing-section)', marginBottom: 'var(--spacing-same)' }}>Temperature</span>
+      <h2 className="text-large-title" style={{ margin: `var(--spacing-cross) 0` }}>Units</h2>
       <UnitPicker />
 
       <button
