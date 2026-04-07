@@ -91,12 +91,12 @@ function CitySearch() {
     }, 300)
   }
 
-  const handleSelect = (city: City) => {
+  const handleSelect = async (city: City) => {
     if (timerRef.current) clearTimeout(timerRef.current)
-    saveCity(city)
     setCurrent(city)
     setQuery('')
     setResults([])
+    await saveCity(city)
     void refreshWeather()
     autoConnect()
   }
@@ -153,9 +153,9 @@ function UnitPicker() {
     onSettingsLoaded(() => setUnit(getSavedUnit()))
   }, [])
 
-  const handleChange = (value: UnitSystem) => {
+  const handleChange = async (value: UnitSystem) => {
     setUnit(value)
-    saveUnit(value)
+    await saveUnit(value)
     void refreshWeather()
   }
 

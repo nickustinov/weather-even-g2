@@ -1,7 +1,7 @@
 {
   "package_id": "com.nickustinov.weatherapp",
   "name": "Weather",
-  "version": "1.1.0",
+  "version": "1.1.2",
   "edition": "202601",
   "description": "Weather forecast for Even G2",
   "tagline": "Current weather and forecasts on your glasses",

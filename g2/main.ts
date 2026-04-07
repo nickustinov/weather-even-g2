@@ -4,6 +4,7 @@ import { appendEventLog } from '../_shared/log'
 import { initApp, refreshWeather } from './app'
 import { initUI } from './ui'
 
+
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = window.setTimeout(() => {

@@ -20,13 +20,9 @@ export async function loadSettings(b: EvenAppBridge): Promise<void> {
   const rawCity = await b.getLocalStorage(CITY_KEY)
   if (rawCity) {
     try { cachedCity = JSON.parse(rawCity) as City } catch { /* ignore */ }
-    appendEventLog(`Settings: loaded city=${cachedCity?.name} from SDK`)
   } else if (cachedCity) {
-    const ok = await b.setLocalStorage(CITY_KEY, JSON.stringify(cachedCity))
-    appendEventLog(`Settings: synced city=${cachedCity.name} to SDK, ok=${ok}`)
-    // Verify it actually persisted
-    const verify = await b.getLocalStorage(CITY_KEY)
-    appendEventLog(`Settings: verify city readback=${verify ? 'ok' : 'empty'}`)
+    // City was set from UI before bridge connected – persist now
+    await b.setLocalStorage(CITY_KEY, JSON.stringify(cachedCity))
   }
 
   const rawUnit = await b.getLocalStorage(UNIT_KEY)
@@ -44,21 +40,20 @@ export function getSavedCity(): City | null {
   return cachedCity
 }
 
-export function saveCity(city: City): void {
+export async function saveCity(city: City): Promise<void> {
   cachedCity = city
   const b = getBridge()
-  if (b) void b.setLocalStorage(CITY_KEY, JSON.stringify(city))
+  if (b) await b.setLocalStorage(CITY_KEY, JSON.stringify(city))
 }
 
 export function getSavedUnit(): UnitSystem {
   return cachedUnit
 }
 
-export function saveUnit(unit: UnitSystem): void {
+export async function saveUnit(unit: UnitSystem): Promise<void> {
   cachedUnit = unit
   const b = getBridge()
-  if (b) void b.setLocalStorage(UNIT_KEY, unit)
-  // If bridge not ready, loadSettings() will sync on connect
+  if (b) await b.setLocalStorage(UNIT_KEY, unit)
 }
 
 export async function searchCities(query: string): Promise<City[]> {

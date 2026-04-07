@@ -56,6 +56,11 @@ async function boot() {
       if (actionBtn) actionBtn.disabled = false
     }
   })
+
+  // Auto-connect on every page load
+  void actions.connect().catch((error) => {
+    console.error('[app-loader] auto-connect failed', error)
+  })
 }
 
 void boot().catch((error) => {
