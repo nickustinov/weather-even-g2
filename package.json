@@ -1,6 +1,6 @@
 {
   "name": "weather-even-g2",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "vite build",
