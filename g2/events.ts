@@ -1,14 +1,7 @@
 import { OsEventTypeList, type EvenHubEvent } from '@evenrealities/even_hub_sdk'
 import { appendEventLog } from '../_shared/log'
 import { getBridge, state } from './state'
-import { showScreen, nextScreen, prevScreen, firstScreen } from './renderer'
-
-// Forward declaration – set by app.ts to avoid circular import
-let refreshWeatherFn: () => Promise<void> = async () => {}
-
-export function setRefreshWeather(fn: () => Promise<void>): void {
-  refreshWeatherFn = fn
-}
+import { showScreen, nextScreen, prevScreen } from './renderer'
 
 // Scroll cooldown to prevent duplicate actions from rapid swipes
 const SCROLL_COOLDOWN_MS = 300
@@ -88,16 +81,11 @@ export function onEvenHubEvent(event: EvenHubEvent): void {
       break
 
     case OsEventTypeList.DOUBLE_CLICK_EVENT:
-      // Even Hub submission requirement: double-tap on the root page
-      // (screenIndex 0 = forecast) must invoke the host exit dialogue.
-      // On other screens, double-tap still jumps back to the root and
-      // refreshes the weather.
-      if (state.screenIndex === 0) {
-        void getBridge()?.shutDownPageContainer(1)
-      } else {
-        firstScreen()
-        void refreshWeatherFn()
-      }
+      // Weather has no back stack – every screen is "root"-level,
+      // reached by horizontal swipe. Double-tap is conventionally the
+      // exit gesture, so invoke the host exit dialogue from anywhere.
+      // This also satisfies the Even Hub submission requirement.
+      void getBridge()?.shutDownPageContainer(1)
       break
   }
 }

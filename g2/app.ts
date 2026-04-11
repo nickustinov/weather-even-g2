@@ -3,7 +3,7 @@ import { appendEventLog } from '../_shared/log'
 import { fetchWeather, getSavedCity, getSavedUnit, loadSettings } from './api'
 import { state, setBridge } from './state'
 import { showScreen, showLoading, firstScreen } from './renderer'
-import { onEvenHubEvent, setRefreshWeather } from './events'
+import { onEvenHubEvent } from './events'
 
 export async function refreshWeather(): Promise<void> {
   const city = getSavedCity()
@@ -28,7 +28,6 @@ let refreshInterval: ReturnType<typeof setInterval> | null = null
 
 export async function initApp(appBridge: EvenAppBridge): Promise<void> {
   setBridge(appBridge)
-  setRefreshWeather(refreshWeather)
 
   appBridge.onEvenHubEvent((event) => {
     onEvenHubEvent(event)
