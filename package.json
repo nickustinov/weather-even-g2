@@ -1,6 +1,6 @@
 {
   "name": "weather-even-g2",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "vite build",
@@ -9,7 +9,7 @@
     "pack": "npm run build && evenhub pack app.json dist -o weather.ehpk"
   },
   "dependencies": {
-    "@evenrealities/even_hub_sdk": "^0.0.9",
+    "@evenrealities/even_hub_sdk": "^0.0.10",
     "even-toolkit": "^1.0.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
