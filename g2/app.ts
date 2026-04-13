@@ -2,7 +2,7 @@ import type { EvenAppBridge } from '@evenrealities/even_hub_sdk'
 import { appendEventLog } from '../_shared/log'
 import { fetchWeather, getSavedCity, getSavedUnit, loadSettings } from './api'
 import { state, setBridge } from './state'
-import { showScreen, showLoading, firstScreen } from './renderer'
+import { showScreen, showLoading, showSetupMessage, firstScreen } from './renderer'
 import { onEvenHubEvent } from './events'
 
 export async function refreshWeather(): Promise<void> {
@@ -36,9 +36,12 @@ export async function initApp(appBridge: EvenAppBridge): Promise<void> {
   await loadSettings(appBridge)
 
   if (getSavedCity()) {
-    appendEventLog('Weather: city found, auto-connecting')
+    appendEventLog('Weather: city found, loading forecast')
     await showLoading()
     await refreshWeather()
+  } else {
+    appendEventLog('Weather: no city configured, showing setup message')
+    await showSetupMessage()
   }
 
   if (!refreshInterval) {
