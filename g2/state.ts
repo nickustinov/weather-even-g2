@@ -19,6 +19,9 @@ export type HourlyPoint = {
   windSpeed: number
   windDir: number
   windGust: number
+  humidity: number
+  dewPoint: number
+  uvIndex: number
 }
 
 export type DailyPoint = {
@@ -71,7 +74,7 @@ export type WeatherData = {
   airQuality: AirQuality | null
 }
 
-export const SCREENS = ['today', 'forecast', 'rain', 'wind', 'hours', 'sun', 'air'] as const
+export const SCREENS = ['today', 'forecast', 'rain', 'wind', 'hours', 'humidity', 'uv', 'sun', 'air'] as const
 export type Screen = (typeof SCREENS)[number]
 
 export type State = {

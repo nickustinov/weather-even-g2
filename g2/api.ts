@@ -121,6 +121,9 @@ type OpenMeteoForecast = {
     wind_speed_10m?: number[]
     wind_direction_10m?: number[]
     wind_gusts_10m?: number[]
+    relative_humidity_2m?: number[]
+    dew_point_2m?: number[]
+    uv_index?: number[]
   }
   daily?: {
     time?: string[]
@@ -144,7 +147,7 @@ export async function fetchWeather(city: City, unit: UnitSystem = 'metric'): Pro
     longitude: String(city.longitude),
     current:
       'temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,surface_pressure',
-    hourly: 'temperature_2m,weather_code,precipitation_probability,precipitation,wind_speed_10m,wind_direction_10m,wind_gusts_10m',
+    hourly: 'temperature_2m,weather_code,precipitation_probability,precipitation,wind_speed_10m,wind_direction_10m,wind_gusts_10m,relative_humidity_2m,dew_point_2m,uv_index',
     daily:
       'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,wind_speed_10m_max,uv_index_max,sunshine_duration,sunrise,sunset',
     timezone: 'auto',
@@ -180,6 +183,9 @@ export async function fetchWeather(city: City, unit: UnitSystem = 'metric'): Pro
         windSpeed: Math.round(hourly.wind_speed_10m?.[idx] ?? 0),
         windDir: Math.round(hourly.wind_direction_10m?.[idx] ?? 0),
         windGust: Math.round(hourly.wind_gusts_10m?.[idx] ?? 0),
+        humidity: Math.round(hourly.relative_humidity_2m?.[idx] ?? 0),
+        dewPoint: Math.round(hourly.dew_point_2m?.[idx] ?? 0),
+        uvIndex: Math.round((hourly.uv_index?.[idx] ?? 0) * 10) / 10,
       }
     })
 
@@ -329,6 +335,35 @@ export function hasPollenData(pollen: Pollen): boolean {
     pollen.mugwort !== null || pollen.olive !== null || pollen.ragweed !== null
 }
 
+// Human comfort vs. relative humidity %. Dew point is a better physical
+// "muggy" gauge, but most users intuit % so we lead with that.
+export function humidityComfort(rh: number): string {
+  if (rh < 30) return 'dry'
+  if (rh < 60) return 'comfortable'
+  if (rh < 70) return 'sticky'
+  if (rh < 85) return 'muggy'
+  return 'oppressive'
+}
+
+// WHO UV category bands.
+export function uvCategory(uv: number): string {
+  if (uv < 3) return 'low'
+  if (uv < 6) return 'moderate'
+  if (uv < 8) return 'high'
+  if (uv < 11) return 'very high'
+  return 'extreme'
+}
+
+// Short form for tight columns — keep ≤4 chars so the value+category fits in
+// the chart's values column.
+export function uvCategoryShort(uv: number): string {
+  if (uv < 3) return 'low'
+  if (uv < 6) return 'mod'
+  if (uv < 8) return 'high'
+  if (uv < 11) return 'v.hi'
+  return 'extr'
+}
+
 // EU air-quality index categories (0–100+ scale).
 export function aqiCategory(aqi: number): string {
   if (aqi < 20) return 'good'
@@ -362,7 +397,17 @@ function applyTestOverrides(w: WeatherData): WeatherData {
   const windDir = num('winddir')
   if (windDir !== undefined) w.windDirection = Math.round(windDir)
   const humidity = num('humidity')
-  if (humidity !== undefined) w.humidity = Math.round(humidity)
+  if (humidity !== undefined) {
+    w.humidity = Math.round(humidity)
+    // Stamp hourly humidity to the same value so the chart screen can be
+    // previewed without crafting a 24-element curve. uv override below does
+    // the same trick for the uv index hourly chart.
+    w.hourly.forEach(h => { h.humidity = Math.round(humidity) })
+  }
+  const uv = num('uv')
+  if (uv !== undefined) {
+    w.hourly.forEach(h => { h.uvIndex = uv })
+  }
   const pressure = num('pressure')
   if (pressure !== undefined) w.pressure = Math.round(pressure)
   const precip = num('precip')
