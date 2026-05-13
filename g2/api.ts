@@ -1,5 +1,5 @@
 import type { EvenAppBridge } from '@evenrealities/even_hub_sdk'
-import type { AirQuality, City, UnitSystem, WeatherData, HourlyPoint, DailyPoint } from './state'
+import type { AirQuality, City, Pollen, UnitSystem, WeatherData, HourlyPoint, DailyPoint } from './state'
 import { getBridge } from './state'
 import { appendEventLog } from '../_shared/log'
 
@@ -233,14 +233,33 @@ type OpenMeteoAirQuality = {
     ozone?: number
     sulphur_dioxide?: number
     carbon_monoxide?: number
+    alder_pollen?: number | null
+    birch_pollen?: number | null
+    grass_pollen?: number | null
+    mugwort_pollen?: number | null
+    olive_pollen?: number | null
+    ragweed_pollen?: number | null
   }
+}
+
+// CAMS Europe pollen is only reported for European latitudes; outside that
+// region the fields come back as null and we let the air screen fall back
+// to pollutant data.
+function roundPollen(v: number | null | undefined): number | null {
+  if (v === null || v === undefined) return null
+  return Math.round(v * 10) / 10
 }
 
 async function fetchAirQuality(city: City): Promise<AirQuality | null> {
   const params = new URLSearchParams({
     latitude: String(city.latitude),
     longitude: String(city.longitude),
-    current: 'european_aqi,pm2_5,pm10,nitrogen_dioxide,ozone,sulphur_dioxide,carbon_monoxide',
+    current: [
+      'european_aqi', 'pm2_5', 'pm10', 'nitrogen_dioxide', 'ozone',
+      'sulphur_dioxide', 'carbon_monoxide',
+      'alder_pollen', 'birch_pollen', 'grass_pollen', 'mugwort_pollen',
+      'olive_pollen', 'ragweed_pollen',
+    ].join(','),
     timezone: 'auto',
   })
   const res = await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?${params}`)
@@ -255,7 +274,59 @@ async function fetchAirQuality(city: City): Promise<AirQuality | null> {
     ozone: Math.round((c.ozone ?? 0) * 10) / 10,
     sulphurDioxide: Math.round((c.sulphur_dioxide ?? 0) * 10) / 10,
     carbonMonoxide: Math.round(c.carbon_monoxide ?? 0),
+    pollen: {
+      alder: roundPollen(c.alder_pollen),
+      birch: roundPollen(c.birch_pollen),
+      grass: roundPollen(c.grass_pollen),
+      mugwort: roundPollen(c.mugwort_pollen),
+      olive: roundPollen(c.olive_pollen),
+      ragweed: roundPollen(c.ragweed_pollen),
+    },
   }
+}
+
+// Pollen category thresholds (grains/m³) per common European pollen networks.
+// Returns a label and the "very high" threshold used to scale unicode bars.
+export type PollenInfo = { label: string; scaleMax: number }
+const POLLEN_SCALES: Record<keyof Pollen, number> = {
+  alder: 100,
+  birch: 100,
+  grass: 200,
+  mugwort: 50,
+  olive: 200,
+  ragweed: 20,
+}
+
+export function pollenScaleMax(species: keyof Pollen): number {
+  return POLLEN_SCALES[species]
+}
+
+export function pollenCategory(species: keyof Pollen, value: number): string {
+  const max = POLLEN_SCALES[species]
+  if (value < max * 0.1) return 'low'
+  if (value < max * 0.3) return 'moderate'
+  if (value < max) return 'high'
+  return 'very high'
+}
+
+// Returns the single most elevated pollen species (as a fraction of its "very
+// high" threshold) for the header. Returns null when no pollen data exists.
+export function dominantPollen(pollen: Pollen): { species: keyof Pollen; value: number } | null {
+  let best: { species: keyof Pollen; value: number; ratio: number } | null = null
+  const species: (keyof Pollen)[] = ['alder', 'birch', 'grass', 'mugwort', 'olive', 'ragweed']
+  for (const s of species) {
+    const v = pollen[s]
+    if (v === null) continue
+    const ratio = v / POLLEN_SCALES[s]
+    if (!best || ratio > best.ratio) best = { species: s, value: v, ratio }
+  }
+  if (!best) return null
+  return { species: best.species, value: best.value }
+}
+
+export function hasPollenData(pollen: Pollen): boolean {
+  return pollen.alder !== null || pollen.birch !== null || pollen.grass !== null ||
+    pollen.mugwort !== null || pollen.olive !== null || pollen.ragweed !== null
 }
 
 // EU air-quality index categories (0–100+ scale).
@@ -324,10 +395,21 @@ function applyTestOverrides(w: WeatherData): WeatherData {
   const o3 = num('o3')
   const so2 = num('so2')
   const co = num('co')
-  if (aqi !== undefined || pm25 !== undefined || pm10 !== undefined || no2 !== undefined ||
-      o3 !== undefined || so2 !== undefined || co !== undefined) {
+  const alder = num('alder')
+  const birch = num('birch')
+  const grass = num('grass')
+  const mugwort = num('mugwort')
+  const olive = num('olive')
+  const ragweed = num('ragweed')
+  const anyAir = aqi !== undefined || pm25 !== undefined || pm10 !== undefined ||
+    no2 !== undefined || o3 !== undefined || so2 !== undefined || co !== undefined
+  const anyPollen = alder !== undefined || birch !== undefined || grass !== undefined ||
+    mugwort !== undefined || olive !== undefined || ragweed !== undefined
+  if (anyAir || anyPollen) {
+    const emptyPollen: Pollen = { alder: null, birch: null, grass: null, mugwort: null, olive: null, ragweed: null }
     const base: AirQuality = w.airQuality ?? {
       euAqi: 0, pm2_5: 0, pm10: 0, nitrogenDioxide: 0, ozone: 0, sulphurDioxide: 0, carbonMonoxide: 0,
+      pollen: emptyPollen,
     }
     w.airQuality = {
       euAqi: aqi !== undefined ? Math.round(aqi) : base.euAqi,
@@ -337,6 +419,14 @@ function applyTestOverrides(w: WeatherData): WeatherData {
       ozone: o3 !== undefined ? o3 : base.ozone,
       sulphurDioxide: so2 !== undefined ? so2 : base.sulphurDioxide,
       carbonMonoxide: co !== undefined ? Math.round(co) : base.carbonMonoxide,
+      pollen: {
+        alder:   alder   !== undefined ? alder   : base.pollen.alder,
+        birch:   birch   !== undefined ? birch   : base.pollen.birch,
+        grass:   grass   !== undefined ? grass   : base.pollen.grass,
+        mugwort: mugwort !== undefined ? mugwort : base.pollen.mugwort,
+        olive:   olive   !== undefined ? olive   : base.pollen.olive,
+        ragweed: ragweed !== undefined ? ragweed : base.pollen.ragweed,
+      },
     }
   }
   return w

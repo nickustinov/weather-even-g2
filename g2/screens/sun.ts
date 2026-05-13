@@ -49,7 +49,7 @@ const SUN_BAR_CHARS = 12
 // 4-row stats grid below (rise / set / full in / distance).
 const MOON_IMG_SIZE = 80
 const MOON_IMG_X = SUN_HALF_W + 8
-const MOON_IMG_Y = SUN_BODY_Y + 4
+const MOON_IMG_Y = SUN_BODY_Y + 14
 const MOON_HEAD_X = MOON_IMG_X + MOON_IMG_SIZE + 10
 const MOON_HEAD_Y = MOON_IMG_Y + 14
 const MOON_HEAD_W = DISPLAY_WIDTH - MOON_HEAD_X - 8

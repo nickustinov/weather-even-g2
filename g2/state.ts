@@ -33,6 +33,15 @@ export type DailyPoint = {
   sunshineHours: number
 }
 
+export type Pollen = {
+  alder: number | null
+  birch: number | null
+  grass: number | null
+  mugwort: number | null
+  olive: number | null
+  ragweed: number | null
+}
+
 export type AirQuality = {
   euAqi: number
   pm2_5: number
@@ -41,6 +50,7 @@ export type AirQuality = {
   ozone: number
   sulphurDioxide: number
   carbonMonoxide: number
+  pollen: Pollen
 }
 
 export type WeatherData = {
