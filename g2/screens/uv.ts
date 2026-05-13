@@ -35,8 +35,6 @@ import {
   todayDateString,
 } from '../render-shared'
 
-// UV maxes out at ~12 in tropical noon sun; clamp the bar scale to 11 so a
-// "very high" reading paints a near-full bar without saturating at 6.
 const UV_BAR_MAX = 11
 
 function uvTimesText(w: WeatherData): string {
@@ -50,8 +48,6 @@ function uvBarsText(w: WeatherData): string {
   }).join('\n')
 }
 
-// Use the category word per row so the screen reads as a forecast of *risk*,
-// not a row of raw numbers most people don't know how to interpret.
 function uvValuesText(w: WeatherData): string {
   return w.hourly.slice(0, CHART_HOURS_VISIBLE).map(h => {
     const val = h.uvIndex < 10 ? h.uvIndex.toFixed(1) : String(Math.round(h.uvIndex))
@@ -64,7 +60,7 @@ function uvValuesText(w: WeatherData): string {
 // when there's no exposure window (overcast / winter / night).
 function protectionWindow(w: WeatherData): string {
   // Walk hours only until the hour-number wraps backwards (= midnight
-  // crossed) so the window doesn't span days and report "protect 17:00–16:00".
+  // crossed) so the window doesn't span days.
   const todayWindow: HourlyPoint[] = []
   let prevHour = -1
   for (const h of w.hourly) {
