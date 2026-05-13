@@ -197,7 +197,7 @@ export async function fetchWeather(city: City, unit: UnitSystem = 'metric'): Pro
   const sunriseToday = daily.sunrise?.[0] ?? ''
   const sunsetToday = daily.sunset?.[0] ?? ''
 
-  return {
+  return applyTestOverrides({
     city: city.name,
     currentTemp: Math.round(current.temperature_2m ?? 0),
     currentWmoCode: current.weather_code ?? 0,
@@ -211,5 +211,38 @@ export async function fetchWeather(city: City, unit: UnitSystem = 'metric'): Pro
     sunset: sunsetToday ? formatTime(sunsetToday) : '',
     hourly: hourlyPoints,
     daily: dailyPoints,
+  })
+}
+
+// URL query overrides for visual testing of edge cases without touching code.
+// Example: ?temp=105&hi=110&lo=-12&wind=99&humidity=100&pressure=1050&precip=12.5
+function applyTestOverrides(w: WeatherData): WeatherData {
+  if (typeof window === 'undefined') return w
+  const p = new URLSearchParams(window.location.search)
+  const num = (key: string): number | undefined => {
+    const v = p.get(key)
+    if (v === null) return undefined
+    const n = Number(v)
+    return Number.isFinite(n) ? n : undefined
   }
+
+  const temp = num('temp')
+  if (temp !== undefined) w.currentTemp = Math.round(temp)
+  const feels = num('feels')
+  if (feels !== undefined) w.feelsLike = Math.round(feels)
+  const wind = num('wind')
+  if (wind !== undefined) w.windSpeed = Math.round(wind)
+  const windDir = num('winddir')
+  if (windDir !== undefined) w.windDirection = Math.round(windDir)
+  const humidity = num('humidity')
+  if (humidity !== undefined) w.humidity = Math.round(humidity)
+  const pressure = num('pressure')
+  if (pressure !== undefined) w.pressure = Math.round(pressure)
+  const precip = num('precip')
+  if (precip !== undefined && w.daily[0]) w.daily[0].precipSum = precip
+  const hi = num('hi')
+  if (hi !== undefined && w.daily[0]) w.daily[0].tempMax = Math.round(hi)
+  const lo = num('lo')
+  if (lo !== undefined && w.daily[0]) w.daily[0].tempMin = Math.round(lo)
+  return w
 }

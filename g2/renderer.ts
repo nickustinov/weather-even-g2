@@ -128,8 +128,15 @@ const TODAY_STAT_VALUE_W = TODAY_RIGHT_W - TODAY_STAT_LABEL_W
 // x-offset (156) is the canvas position of the degree for a 2-digit temp at
 // dotSize=8 — 1- and 3-digit temps shift the degree, so this can drift.
 const TODAY_CONDITION_ICON_SIZE = 61
-const TODAY_CONDITION_ICON_X = TODAY_TEMP_X + 156
-const TODAY_CONDITION_ICON_Y = TODAY_TEMP_Y + 66
+const TODAY_CONDITION_ICON_X_BASE = TODAY_TEMP_X + 156
+// 2-char temps render with bigger dotSize → digits extend lower → icon needs
+// to drop too. Each extra char (3-digit or negative) shrinks dotSize and the
+// icon should rise to stay snug against the digit baseline.
+const TODAY_CONDITION_ICON_Y_BASE = TODAY_TEMP_Y + 66
+const TODAY_CONDITION_ICON_PER_EXTRA_CHAR_Y = 5
+// Each char beyond the 2-digit baseline pushes the degree (and icon) right
+// by ~55px in the rendered dotted font. Covers 3-digit and negative temps.
+const TODAY_CONDITION_ICON_PER_EXTRA_CHAR = 55
 
 const DAYS_SHORT = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 const MONTHS_SHORT = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
@@ -211,6 +218,9 @@ async function showTodayScreen(w: WeatherData): Promise<void> {
   }
 
   const headlineText = `${w.currentTemp}°`
+  const extraChars = Math.max(0, String(w.currentTemp).length - 2)
+  const conditionIconX = TODAY_CONDITION_ICON_X_BASE + extraChars * TODAY_CONDITION_ICON_PER_EXTRA_CHAR
+  const conditionIconY = TODAY_CONDITION_ICON_Y_BASE - extraChars * TODAY_CONDITION_ICON_PER_EXTRA_CHAR_Y
 
   await rebuildPage({
     containerTotalNum: 6,
@@ -272,8 +282,8 @@ async function showTodayScreen(w: WeatherData): Promise<void> {
       new ImageContainerProperty({
         containerID: 6,
         containerName: 'condition',
-        xPosition: TODAY_CONDITION_ICON_X,
-        yPosition: TODAY_CONDITION_ICON_Y,
+        xPosition: conditionIconX,
+        yPosition: conditionIconY,
         width: TODAY_CONDITION_ICON_SIZE,
         height: TODAY_CONDITION_ICON_SIZE,
       }),
