@@ -5,7 +5,15 @@ import {
 import { appendEventLog } from '../../_shared/log'
 import { DISPLAY_WIDTH } from '../layout'
 import { canvasToBytes } from '../icons'
-import { drawMoon, moonPhase } from '../moon'
+import { getSavedCity } from '../api'
+import {
+  daysToPhase,
+  drawMoon,
+  formatHHMM,
+  moonDistanceKm,
+  moonPhase,
+  moonRiseSet,
+} from '../moon'
 import { state } from '../state'
 import type { WeatherData } from '../state'
 import {
@@ -22,32 +30,37 @@ import {
 
 const SUN_BODY_Y = CHART_HEADER_H + 4
 const SUN_HALF_W = Math.floor(DISPLAY_WIDTH / 2)
+const LINE_H = 27
 
-// Left half (sun): label/value rows + progress bar + daylight remaining.
+// Left half: sunrise / sunset table + progress bar + day length.
 const SUN_LABEL_X = CHART_PAD
 const SUN_LABEL_W = 90
 const SUN_VALUE_X = SUN_LABEL_X + SUN_LABEL_W
 const SUN_VALUE_W = SUN_HALF_W - SUN_VALUE_X - 8
 const SUN_TIMES_Y = SUN_BODY_Y + 10
-const SUN_TIMES_H = 64                    // 2 rows + paddingLength
+const SUN_TIMES_H = LINE_H * 2 + 12
 const SUN_BAR_Y = SUN_TIMES_Y + SUN_TIMES_H + 8
-const SUN_BAR_H = 40
+const SUN_BAR_H = 36
 const SUN_REMAIN_Y = SUN_BAR_Y + SUN_BAR_H + 4
-const SUN_REMAIN_H = 36
-
-// Each ━/─/● glyph is 20px in the firmware font. 12 chars × 20 = 240px fits
-// the 264px content area (272 width − 2×4 padding) with 24px of slack so the
-// line doesn't wrap and trigger a scrollbar sliver.
+const SUN_REMAIN_H = LINE_H + 10
 const SUN_BAR_CHARS = 12
 
-// Right half (moon): visual on top, phase + illumination below.
-const MOON_AREA_X = SUN_HALF_W
-const MOON_AREA_W = DISPLAY_WIDTH - MOON_AREA_X
-const MOON_IMG_SIZE = 100
-const MOON_IMG_X = MOON_AREA_X + Math.floor((MOON_AREA_W - MOON_IMG_SIZE) / 2)
-const MOON_IMG_Y = SUN_BODY_Y + 14
-const MOON_TEXT_Y = MOON_IMG_Y + MOON_IMG_SIZE + 8
-const MOON_TEXT_H = 70                    // 2 lines + paddingLength
+// Right half: small moon icon top-left + phase/illum next to it, then a
+// 4-row stats grid below (rise / set / full in / distance).
+const MOON_IMG_SIZE = 80
+const MOON_IMG_X = SUN_HALF_W + 8
+const MOON_IMG_Y = SUN_BODY_Y + 4
+const MOON_HEAD_X = MOON_IMG_X + MOON_IMG_SIZE + 10
+const MOON_HEAD_Y = MOON_IMG_Y + 14
+const MOON_HEAD_W = DISPLAY_WIDTH - MOON_HEAD_X - 8
+const MOON_HEAD_H = LINE_H * 2 + 8
+
+const MOON_STATS_Y = MOON_IMG_Y + MOON_IMG_SIZE + 10
+const MOON_STATS_H = LINE_H * 4 + 12
+const MOON_STATS_LABEL_X = SUN_HALF_W + 8
+const MOON_STATS_LABEL_W = 110
+const MOON_STATS_VALUE_X = MOON_STATS_LABEL_X + MOON_STATS_LABEL_W
+const MOON_STATS_VALUE_W = DISPLAY_WIDTH - MOON_STATS_VALUE_X - 8
 
 function sunLabels(): string {
   return ['sunrise', 'sunset'].join('\n')
@@ -87,9 +100,23 @@ async function renderMoonImage(phase: number): Promise<number[]> {
 
 export async function showSunScreen(w: WeatherData): Promise<void> {
   const moon = moonPhase()
+  const city = getSavedCity()
+  const now = new Date()
+  const times = city ? moonRiseSet(now, city.latitude, city.longitude) : { rise: null, set: null }
+  const distance = city ? moonDistanceKm(now, city.latitude, city.longitude) : null
+  const daysToFull = daysToPhase(0.5, moon.phase)
+
+  const moonHeadText = `${moon.name}\n${moon.illumination}% illuminated`
+  const statsLabels = ['moonrise', 'moonset', 'full in', 'distance'].join('\n')
+  const statsValues = [
+    formatHHMM(times.rise),
+    formatHHMM(times.set),
+    `${daysToFull} d`,
+    distance !== null ? `${distance.toLocaleString()} km` : '–',
+  ].join('\n')
 
   await rebuildPage({
-    containerTotalNum: 7,
+    containerTotalNum: 9,
     textObject: [
       new TextContainerProperty({
         containerID: 1,
@@ -148,19 +175,41 @@ export async function showSunScreen(w: WeatherData): Promise<void> {
       }),
       new TextContainerProperty({
         containerID: 6,
-        containerName: 'moontext',
-        content: `${moon.name}\n${moon.illumination}% lit`,
-        xPosition: MOON_IMG_X,
-        yPosition: MOON_TEXT_Y,
-        width: DISPLAY_WIDTH - MOON_IMG_X - 4,
-        height: MOON_TEXT_H,
+        containerName: 'moonhead',
+        content: moonHeadText,
+        xPosition: MOON_HEAD_X,
+        yPosition: MOON_HEAD_Y,
+        width: MOON_HEAD_W,
+        height: MOON_HEAD_H,
+        isEventCapture: 0,
+        paddingLength: 4,
+      }),
+      new TextContainerProperty({
+        containerID: 7,
+        containerName: 'moonlabels',
+        content: statsLabels,
+        xPosition: MOON_STATS_LABEL_X,
+        yPosition: MOON_STATS_Y,
+        width: MOON_STATS_LABEL_W,
+        height: MOON_STATS_H,
+        isEventCapture: 0,
+        paddingLength: 4,
+      }),
+      new TextContainerProperty({
+        containerID: 8,
+        containerName: 'moonvalues',
+        content: statsValues,
+        xPosition: MOON_STATS_VALUE_X,
+        yPosition: MOON_STATS_Y,
+        width: MOON_STATS_VALUE_W,
+        height: MOON_STATS_H,
         isEventCapture: 0,
         paddingLength: 4,
       }),
     ],
     imageObject: [
       new ImageContainerProperty({
-        containerID: 7,
+        containerID: 9,
         containerName: 'moon',
         xPosition: MOON_IMG_X,
         yPosition: MOON_IMG_Y,
@@ -170,6 +219,6 @@ export async function showSunScreen(w: WeatherData): Promise<void> {
     ],
   })
 
-  await sendImage(await renderMoonImage(moon.phase), 7, 'moon')
+  await sendImage(await renderMoonImage(moon.phase), 9, 'moon')
   appendEventLog(`Screen: ${state.screen}`)
 }

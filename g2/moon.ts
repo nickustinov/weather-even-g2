@@ -1,6 +1,9 @@
 // Moon phase math + canvas rendering. Open-Meteo doesn't provide moon phase
 // directly, but it's deterministic from date — synodic period is 29.530588
-// days starting from a known new moon.
+// days starting from a known new moon. Moonrise/moonset/distance use suncalc
+// because those depend on observer lat/lon and proper orbital mechanics.
+
+import SunCalc from 'suncalc'
 
 const SYNODIC_PERIOD_DAYS = 29.530588853
 // Known new moon: 2000-01-06 18:14 UTC.
@@ -33,6 +36,38 @@ export function moonPhase(date: Date = new Date()): MoonPhaseInfo {
 
   const illumination = Math.round((1 - Math.cos(phase * 2 * Math.PI)) / 2 * 100)
   return { phase, name, illumination }
+}
+
+export function daysToPhase(targetPhase: number, currentPhase: number): number {
+  let delta = targetPhase - currentPhase
+  if (delta <= 0) delta += 1
+  return Math.round(delta * SYNODIC_PERIOD_DAYS)
+}
+
+export type MoonRiseSet = {
+  rise: Date | null
+  set: Date | null
+}
+
+// Wraps SunCalc.getMoonTimes; suncalc may report no rise/set on some days
+// (very high latitudes around solstice) — in which case fields are null.
+export function moonRiseSet(date: Date, lat: number, lon: number): MoonRiseSet {
+  const r = SunCalc.getMoonTimes(date, lat, lon, false)
+  return {
+    rise: r.rise instanceof Date ? r.rise : null,
+    set: r.set instanceof Date ? r.set : null,
+  }
+}
+
+export function moonDistanceKm(date: Date, lat: number, lon: number): number {
+  return Math.round(SunCalc.getMoonPosition(date, lat, lon).distance)
+}
+
+export function formatHHMM(d: Date | null): string {
+  if (!d) return '—'
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  return `${hh}:${mm}`
 }
 
 // Draws the moon as a filled white disk minus the unlit portion. The

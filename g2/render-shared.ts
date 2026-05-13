@@ -190,15 +190,22 @@ export const CHART_VALUES_W = 90
 export const CHART_TOTAL_X = CHART_VALUES_X + CHART_VALUES_W + 12
 export const CHART_TOTAL_W = 576 - CHART_TOTAL_X - CHART_PAD
 
-// Top label nudged 6px down, bottom label nudged 14px up (closer to number)
-// since the dotted glyph is much narrower than its container and the bottom
-// has more visible empty space.
-export const CHART_LABEL_TOP_Y = 56
+// Dotted glyph at dotSize=2, cellGap=1 renders ~62px tall, centered in a
+// 68px container (~3px empty above/below). Labels sit with CHART_LABEL_GAP
+// of visual breathing room between the rendered digit edge and the rendered
+// label text edge — the image container's black fill paints over any
+// container-level overlap, so the gap is measured against the digit pixels.
+export const CHART_TOTAL_Y = 120
+export const CHART_TOTAL_H = 68
+const CHART_LABEL_GAP = 16
 export const CHART_LABEL_TOP_H = 36
-export const CHART_TOTAL_Y = 90
-export const CHART_TOTAL_H = 120
-export const CHART_LABEL_BOT_Y = CHART_TOTAL_Y + CHART_TOTAL_H - 14
+// digit_top = CHART_TOTAL_Y + 3, text_bottom = TOP_Y + 4 + 27 = TOP_Y + 31
+// → TOP_Y = (CHART_TOTAL_Y + 3) - CHART_LABEL_GAP - 31
+export const CHART_LABEL_TOP_Y = CHART_TOTAL_Y - 28 - CHART_LABEL_GAP
 export const CHART_LABEL_BOT_H = 36
+// digit_bot = CHART_TOTAL_Y + CHART_TOTAL_H - 3, text_top = BOT_Y + 4
+// → BOT_Y = (CHART_TOTAL_Y + CHART_TOTAL_H - 3) + CHART_LABEL_GAP - 4
+export const CHART_LABEL_BOT_Y = CHART_TOTAL_Y + CHART_TOTAL_H - 7 + CHART_LABEL_GAP
 
 // Pinned mini-dot size so the headline renders at the same visual size on
 // rain and wind. With cellGap=1 the macro cells are visually separated.
