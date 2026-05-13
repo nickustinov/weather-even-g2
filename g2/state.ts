@@ -99,6 +99,9 @@ export type State = {
   screenIndex: number
   startupRendered: boolean
   weather: WeatherData | null
+  // Modal overlay — when non-null events route to the modal handler and
+  // the modal renderer draws over the regular screen rotation.
+  modal: 'cities' | null
 }
 
 export const state: State = {
@@ -106,6 +109,7 @@ export const state: State = {
   screenIndex: 0,
   startupRendered: false,
   weather: null,
+  modal: null,
 }
 
 let _bridge: EvenAppBridge | null = null

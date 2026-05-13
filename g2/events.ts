@@ -1,8 +1,9 @@
 import { OsEventTypeList, type EvenHubEvent } from '@evenrealities/even_hub_sdk'
 import { appendEventLog } from '../_shared/log'
 import { getBridge, state } from './state'
-import { showScreen, nextScreen, prevScreen } from './renderer'
-import { onForegroundEnter, onAppExit } from './app'
+import { showScreen, nextScreen, prevScreen, showCityPickerScreen } from './renderer'
+import { onForegroundEnter, onAppExit, refreshWeather } from './app'
+import { cityKey, getCities, setActiveCity } from './api'
 
 // Scroll cooldown to prevent duplicate actions from rapid swipes
 const SCROLL_COOLDOWN_MS = 300
@@ -50,14 +51,63 @@ export function resolveEventType(event: EvenHubEvent): OsEventTypeList | undefin
 // Dispatcher
 // ---------------------------------------------------------------------------
 
+function readListIndex(event: EvenHubEvent): number {
+  const idx = event.listEvent?.currentSelectItemIndex
+  return typeof idx === 'number' && idx >= 0 ? idx : 0
+}
+
+async function handleCityPickerClick(event: EvenHubEvent): Promise<void> {
+  const idx = readListIndex(event)
+  if (idx === 0) {
+    // "‹ Back" — dismiss without changing the active city.
+    state.modal = null
+    await showScreen()
+    return
+  }
+  const cities = getCities()
+  const target = cities[idx - 1]
+  if (!target) {
+    state.modal = null
+    await showScreen()
+    return
+  }
+  await setActiveCity(cityKey(target))
+  state.modal = null
+  await refreshWeather()
+  // refreshWeather already calls showScreen via firstScreen(); no extra paint.
+}
+
 export function onEvenHubEvent(event: EvenHubEvent): void {
   const eventType = resolveEventType(event)
-  appendEventLog(`Event: type=${String(eventType)} screen=${state.screen}`)
+  appendEventLog(`Event: type=${String(eventType)} screen=${state.screen} modal=${state.modal ?? '-'}`)
+
+  // Modal: city picker captures all clicks and double-clicks.
+  if (state.modal === 'cities') {
+    if (eventType === OsEventTypeList.CLICK_EVENT) {
+      void handleCityPickerClick(event)
+      return
+    }
+    if (eventType === OsEventTypeList.DOUBLE_CLICK_EVENT) {
+      state.modal = null
+      void showScreen()
+      return
+    }
+    // Scroll events are handled internally by the firmware list container.
+    return
+  }
 
   switch (eventType) {
-    case OsEventTypeList.CLICK_EVENT:
-      // Tap does nothing – scroll to navigate
+    case OsEventTypeList.CLICK_EVENT: {
+      // Tap opens the city picker. We log the decision so a missing reaction
+      // is easy to diagnose in the event log (the most common cause is the
+      // user only having one city saved).
+      const n = getCities().length
+      appendEventLog(`Click: cities=${n} → ${n > 1 ? 'open picker' : 'ignored'}`)
+      if (n > 1) {
+        void showCityPickerScreen()
+      }
       break
+    }
 
     case OsEventTypeList.SCROLL_BOTTOM_EVENT:
       // Swipe down = next screen (matches the natural reading order).

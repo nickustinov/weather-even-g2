@@ -16,11 +16,16 @@ import { showHumidityScreen } from './screens/humidity'
 import { showUvScreen } from './screens/uv'
 import { showSunScreen } from './screens/sun'
 import { showAirScreen } from './screens/air'
+import { showCityPickerScreen } from './screens/cities'
 import { showLoading, showSetupMessage } from './screens/idle'
 
-export { showLoading, showSetupMessage }
+export { showLoading, showSetupMessage, showCityPickerScreen }
 
 export async function showScreen(): Promise<void> {
+  if (state.modal === 'cities') {
+    await showCityPickerScreen()
+    return
+  }
   if (!state.weather) {
     await showLoading()
     return

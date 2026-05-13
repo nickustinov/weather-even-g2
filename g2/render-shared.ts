@@ -8,6 +8,7 @@ import {
   ImageRawDataUpdate,
   RebuildPageContainer,
   type ImageContainerProperty,
+  type ListContainerProperty,
   type TextContainerProperty,
 } from '@evenrealities/even_hub_sdk'
 import { appendEventLog } from '../_shared/log'
@@ -25,6 +26,7 @@ export async function rebuildPage(config: {
   containerTotalNum: number
   textObject?: TextContainerProperty[]
   imageObject?: ImageContainerProperty[]
+  listObject?: ListContainerProperty[]
 }): Promise<void> {
   const b = getBridge()
   if (!b) return

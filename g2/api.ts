@@ -3,29 +3,60 @@ import type { AirQuality, City, Pollen, ScreenPref, Screen, UnitSystem, WeatherD
 import { DEFAULT_SCREEN_PREFS, SCREENS, getBridge } from './state'
 import { appendEventLog } from '../_shared/log'
 
-const CITY_KEY = 'weather:city'
+const CITY_KEY = 'weather:city'        // legacy: single-city storage, migrated
+const CITIES_KEY = 'weather:cities'
+const ACTIVE_KEY = 'weather:active-city'
 const UNIT_KEY = 'weather:unit'
 const SCREENS_KEY = 'weather:screens'
 
 // --- Settings (SDK local storage + memory cache) ---
 
-let cachedCity: City | null = null
+let cachedCities: City[] = []
+let cachedActiveKey: string = ''
 let cachedUnit: UnitSystem = 'metric'
 let cachedScreenPrefs: ScreenPref[] = DEFAULT_SCREEN_PREFS.slice()
 const settingsListeners: Array<() => void> = []
 const screenPrefsListeners: Array<() => void> = []
+const citiesListeners: Array<() => void> = []
+
+// Stable identifier for a city — coordinates uniquely identify a place
+// (two cities sharing a name distinguish themselves by lat/lng) and survive
+// rename quirks in the geocoder.
+export function cityKey(city: City): string {
+  return `${city.latitude.toFixed(4)},${city.longitude.toFixed(4)}`
+}
 
 export function onSettingsLoaded(cb: () => void): void {
   settingsListeners.push(cb)
 }
 
 export async function loadSettings(b: EvenAppBridge): Promise<void> {
-  const rawCity = await b.getLocalStorage(CITY_KEY)
-  if (rawCity) {
-    try { cachedCity = JSON.parse(rawCity) as City } catch { /* ignore */ }
-  } else if (cachedCity) {
-    // City was set from UI before bridge connected – persist now
-    await b.setLocalStorage(CITY_KEY, JSON.stringify(cachedCity))
+  const rawCities = await b.getLocalStorage(CITIES_KEY)
+  if (rawCities) {
+    try { cachedCities = JSON.parse(rawCities) as City[] } catch { /* ignore */ }
+  }
+  const rawActive = await b.getLocalStorage(ACTIVE_KEY)
+  if (rawActive) cachedActiveKey = rawActive
+
+  // Migrate legacy single-city storage if no multi-city list exists yet.
+  if (cachedCities.length === 0) {
+    const rawLegacy = await b.getLocalStorage(CITY_KEY)
+    if (rawLegacy) {
+      try {
+        const legacy = JSON.parse(rawLegacy) as City
+        cachedCities = [legacy]
+        cachedActiveKey = cityKey(legacy)
+        await b.setLocalStorage(CITIES_KEY, JSON.stringify(cachedCities))
+        await b.setLocalStorage(ACTIVE_KEY, cachedActiveKey)
+      } catch { /* ignore */ }
+    }
+  }
+
+  // Ensure active key references a city in the list; otherwise fall back to
+  // the first entry (or stay empty if no cities exist).
+  if (cachedCities.length > 0 && !cachedCities.some(c => cityKey(c) === cachedActiveKey)) {
+    cachedActiveKey = cityKey(cachedCities[0])
+    await b.setLocalStorage(ACTIVE_KEY, cachedActiveKey)
   }
 
   const rawUnit = await b.getLocalStorage(UNIT_KEY)
@@ -43,9 +74,10 @@ export async function loadSettings(b: EvenAppBridge): Promise<void> {
     } catch { /* ignore parse errors, keep defaults */ }
   }
 
-  appendEventLog(`Settings: city=${cachedCity?.name ?? 'none'} unit=${cachedUnit}`)
+  appendEventLog(`Settings: cities=${cachedCities.length} active=${cachedActiveKey || 'none'} unit=${cachedUnit}`)
   for (const cb of settingsListeners) cb()
   for (const cb of screenPrefsListeners) cb()
+  for (const cb of citiesListeners) cb()
 }
 
 // Reconciles persisted prefs with the current SCREENS catalog: keeps any
@@ -82,14 +114,74 @@ export function onScreenPrefsChanged(cb: () => void): void {
   screenPrefsListeners.push(cb)
 }
 
-export function getSavedCity(): City | null {
-  return cachedCity
+export function getCities(): City[] {
+  return cachedCities
 }
 
-export async function saveCity(city: City): Promise<void> {
-  cachedCity = city
+export function getActiveCity(): City | null {
+  return cachedCities.find(c => cityKey(c) === cachedActiveKey) ?? null
+}
+
+// Kept for backwards compatibility — every screen module reads the
+// currently active city through this name.
+export function getSavedCity(): City | null {
+  return getActiveCity()
+}
+
+async function persistCities(): Promise<void> {
   const b = getBridge()
-  if (b) await b.setLocalStorage(CITY_KEY, JSON.stringify(city))
+  if (!b) return
+  await b.setLocalStorage(CITIES_KEY, JSON.stringify(cachedCities))
+  await b.setLocalStorage(ACTIVE_KEY, cachedActiveKey)
+}
+
+export async function addCity(city: City): Promise<void> {
+  const k = cityKey(city)
+  if (!cachedCities.some(c => cityKey(c) === k)) {
+    cachedCities = [...cachedCities, city]
+  }
+  cachedActiveKey = k
+  await persistCities()
+  for (const cb of citiesListeners) cb()
+}
+
+export async function removeCity(key: string): Promise<void> {
+  const next = cachedCities.filter(c => cityKey(c) !== key)
+  cachedCities = next
+  if (cachedActiveKey === key) {
+    cachedActiveKey = next.length > 0 ? cityKey(next[0]) : ''
+  }
+  await persistCities()
+  for (const cb of citiesListeners) cb()
+}
+
+// Replace the saved cities list (used by the browser UI drag reorder).
+// Preserves the active key as long as that city is still in the new list.
+export async function setCities(cities: City[]): Promise<void> {
+  cachedCities = cities
+  if (!cities.some(c => cityKey(c) === cachedActiveKey)) {
+    cachedActiveKey = cities.length > 0 ? cityKey(cities[0]) : ''
+  }
+  await persistCities()
+  for (const cb of citiesListeners) cb()
+}
+
+export async function setActiveCity(key: string): Promise<void> {
+  if (!cachedCities.some(c => cityKey(c) === key)) return
+  cachedActiveKey = key
+  const b = getBridge()
+  if (b) await b.setLocalStorage(ACTIVE_KEY, key)
+  for (const cb of citiesListeners) cb()
+}
+
+export function onCitiesChanged(cb: () => void): void {
+  citiesListeners.push(cb)
+}
+
+// Legacy name kept for the city-search flow in ui.tsx — adds the city to
+// the list and makes it active.
+export async function saveCity(city: City): Promise<void> {
+  await addCity(city)
 }
 
 export function getSavedUnit(): UnitSystem {
