@@ -169,18 +169,18 @@ const GLYPHS: Record<string, Glyph> = {
     'OO.',
     'OO.',
   ]},
-  '°': { width: 5, rows: [
-    '.OOO.',
-    'O...O',
-    'O...O',
-    '.OOO.',
-    '.....',
-    '.....',
-    '.....',
-    '.....',
-    '.....',
-    '.....',
-    '.....',
+  '°': { width: 4, rows: [
+    '.OO.',
+    'O..O',
+    'O..O',
+    '.OO.',
+    '....',
+    '....',
+    '....',
+    '....',
+    '....',
+    '....',
+    '....',
   ]},
   ' ': { width: 3, rows: [
     '...',
@@ -272,7 +272,7 @@ export function autoSizeDotted(
 ): DotTextOpts {
   for (let d = maxDotSize; d >= minDotSize; d--) {
     const gap = Math.max(1, Math.floor(d / 3))
-    const opts: DotTextOpts = { dotSize: d, dotGap: gap, charGap: Math.max(2, gap * 2) }
+    const opts: DotTextOpts = { dotSize: d, dotGap: gap, charGap: Math.max(6, gap * 2 + 4) }
     const m = measureDotted(text, opts)
     if (m.width <= maxWidth && m.height <= maxHeight) return opts
   }

@@ -77,21 +77,21 @@ export async function searchCities(query: string): Promise<City[]> {
 }
 
 function wmoDescription(code: number): string {
-  if (code === 0) return 'Clear sky'
-  if (code === 1) return 'Mainly clear'
-  if (code === 2) return 'Partly cloudy'
-  if (code === 3) return 'Overcast'
-  if (code === 45 || code === 48) return 'Foggy'
-  if (code >= 51 && code <= 57) return 'Drizzle'
-  if (code >= 61 && code <= 67) return 'Rain'
-  if (code >= 71 && code <= 77) return 'Snow'
-  if (code >= 80 && code <= 82) return 'Rain showers'
-  if (code >= 85 && code <= 86) return 'Snow showers'
-  if (code >= 95) return 'Thunderstorm'
-  return 'Unknown'
+  if (code === 0) return 'clear sky'
+  if (code === 1) return 'mainly clear'
+  if (code === 2) return 'partly cloudy'
+  if (code === 3) return 'overcast'
+  if (code === 45 || code === 48) return 'foggy'
+  if (code >= 51 && code <= 57) return 'drizzle'
+  if (code >= 61 && code <= 67) return 'rain'
+  if (code >= 71 && code <= 77) return 'snow'
+  if (code >= 80 && code <= 82) return 'rain showers'
+  if (code >= 85 && code <= 86) return 'snow showers'
+  if (code >= 95) return 'thunderstorm'
+  return 'unknown'
 }
 
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 
 function formatTime(isoString: string): string {
   return new Date(isoString).toLocaleTimeString([], {
@@ -147,7 +147,7 @@ export async function fetchWeather(city: City, unit: UnitSystem = 'metric'): Pro
     daily:
       'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,wind_speed_10m_max,uv_index_max,sunshine_duration,sunrise,sunset',
     timezone: 'auto',
-    forecast_days: '7',
+    forecast_days: '10',
     temperature_unit: imperial ? 'fahrenheit' : 'celsius',
     wind_speed_unit: imperial ? 'mph' : 'kmh',
     precipitation_unit: imperial ? 'inch' : 'mm',
