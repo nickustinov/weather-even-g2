@@ -89,7 +89,7 @@ const GLYPHS: Record<string, Glyph> = {
     '.....OO',
     '.....OO',
     '.....OO',
-    '.OOOOO.',
+    'OOOOOO.',
   ]},
   '6': { width: 7, rows: [
     '.OOOOO.',
