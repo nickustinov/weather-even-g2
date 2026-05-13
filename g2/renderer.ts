@@ -12,7 +12,7 @@ import type { WeatherData } from './state'
 import { getSavedUnit } from './api'
 import { canvasToBytes } from './icons'
 import { drawWeatherIcon } from './weather-icons'
-import { autoSizeDotted, drawDotted, measureDotted } from './dot-digits'
+import { autoSizeDotted, drawDotted, measureDotted, type DotTextOpts } from './dot-digits'
 
 // ---------------------------------------------------------------------------
 // Rebuild helper
@@ -192,8 +192,12 @@ function todayStatValues(w: WeatherData, today: WeatherData['daily'][number]): s
   ].join('\n')
 }
 
-function renderDottedNumberBytes(text: string, w: number, h: number): number[] {
-  const opts = autoSizeDotted(text, w - 12, h - 8, 10, 5)
+// `fixedOpts` lets callers force the dotSize so the headline stays the same
+// visual size regardless of value. Today omits it (auto-sizes per value);
+// rain/wind pass CHART_HEADLINE_OPTS so swiping between them doesn't change
+// the dotted-number height.
+function renderDottedNumberBytes(text: string, w: number, h: number, fixedOpts?: DotTextOpts): number[] {
+  const opts = fixedOpts ?? autoSizeDotted(text, w - 12, h - 8, 10, 5)
   const m = measureDotted(text, opts)
   const canvas = document.createElement('canvas')
   canvas.width = w
@@ -307,7 +311,9 @@ const COL_H = DISPLAY_HEIGHT - COL_Y
 // 288 with paddingLength=4 (content area = 280 exact). Split into 5 + 5 icon
 // and bar strips to stay under the 144px image-container ceiling.
 const FORECAST_DAYS = 10
-const FORECAST_BODY_Y = 0
+// y=2 matches Today/Rain/Wind header start so swiping between screens
+// doesn't jump the top-left corner.
+const FORECAST_BODY_Y = 2
 const FORECAST_BODY_H = DISPLAY_HEIGHT
 const FORECAST_COL_PAD = 4
 // 27px is the firmware font's line height — verified against
@@ -335,10 +341,12 @@ const FORECAST_ICON_X = DAY_COL_X + DAY_COL_W + 18
 // 48px gap matches the visual day-to-icon spacing for typical day labels.
 const TEMPS_COL_X = FORECAST_ICON_X + FORECAST_ICON_STRIP_W + 48
 const TEMPS_COL_W = DISPLAY_WIDTH - TEMPS_COL_X - FORECAST_X_GUTTER
-// Each ━/─ glyph measures 20px wide in the firmware font, so 15 chars =
-// 300px. Plus "14° " (32px) and " 20°" (36px), the full row is 368px and
-// fits in the ~380px content area when TEMPS_COL_X is offset by 48.
-const FORECAST_BAR_CHARS = 15
+// Each ━/─ glyph measures 20px wide in the firmware font, so 13 chars =
+// 260px. Plus "105° " (52px) and " 105°" (52px) — the worst-case 3-char
+// temps on both ends — the full row is 364px and fits in the 380px content
+// area. 15 chars only fit 2-char temps; 13 keeps the layout stable across
+// the realistic temperature range.
+const FORECAST_BAR_CHARS = 13
 
 function forecastDays(w: WeatherData): string {
   return w.daily.slice(0, FORECAST_DAYS).map((d, i) => i === 0 ? 'today' : d.day).join('\n')
@@ -471,48 +479,59 @@ function formatPressure(hPa: number): string {
 // ━/─ Unicode chars. Times and percents go in their own containers because
 // the firmware font is proportional — 20:00 is wider than 13:00, so a single
 // container would misalign the bars.
-const RAIN_PAD = 8
-const RAIN_HEADER_H = 38
-const RAIN_BODY_Y = RAIN_HEADER_H + 4
-const RAIN_BODY_H = DISPLAY_HEIGHT - RAIN_BODY_Y - RAIN_PAD
-const RAIN_HOURS_VISIBLE = 8
-const RAIN_BAR_CHARS = 8
+// Shared rain/wind layout — both screens use identical container geometry
+// so swiping between them doesn't shift any element. Right column (percents
+// for rain, values for wind) is 90px to fit the widest expected content
+// ('100 ↗ ne' ≈ 77px); rain's percent strings have plenty of slack.
+const CHART_PAD = 8
+const CHART_HEADER_H = 38
+const CHART_BODY_Y = CHART_HEADER_H + 4
+const CHART_BODY_H = DISPLAY_HEIGHT - CHART_BODY_Y - CHART_PAD
+const CHART_HOURS_VISIBLE = 8
+const CHART_BAR_CHARS = 8
 
-const RAIN_TIMES_X = RAIN_PAD
-const RAIN_TIMES_W = 60
-const RAIN_BARS_X = RAIN_TIMES_X + RAIN_TIMES_W + 4
-const RAIN_BARS_W = 174
-const RAIN_PERCENTS_X = RAIN_BARS_X + RAIN_BARS_W + 4
-const RAIN_PERCENTS_W = 68
-const RAIN_TOTAL_X = RAIN_PERCENTS_X + RAIN_PERCENTS_W + 12
-const RAIN_TOTAL_W = DISPLAY_WIDTH - RAIN_TOTAL_X - RAIN_PAD
+const CHART_TIMES_X = CHART_PAD
+const CHART_TIMES_W = 60
+const CHART_BARS_X = CHART_TIMES_X + CHART_TIMES_W + 4
+const CHART_BARS_W = 174
+const CHART_VALUES_X = CHART_BARS_X + CHART_BARS_W + 4
+const CHART_VALUES_W = 90
+const CHART_TOTAL_X = CHART_VALUES_X + CHART_VALUES_W + 12
+const CHART_TOTAL_W = DISPLAY_WIDTH - CHART_TOTAL_X - CHART_PAD
 
-const RAIN_PRECIP_LABEL_Y = 50
-const RAIN_PRECIP_LABEL_H = 36
-const RAIN_TOTAL_Y = 90
-const RAIN_TOTAL_H = 120
-const RAIN_LABEL_Y = RAIN_TOTAL_Y + RAIN_TOTAL_H
-const RAIN_LABEL_H = 36
+const CHART_LABEL_TOP_Y = 50
+const CHART_LABEL_TOP_H = 36
+const CHART_TOTAL_Y = 90
+const CHART_TOTAL_H = 120
+const CHART_LABEL_BOT_Y = CHART_TOTAL_Y + CHART_TOTAL_H
+const CHART_LABEL_BOT_H = 36
+
+// Pinned dotSize so the headline number renders at the same visual size on
+// rain and wind regardless of value. d=7 is the largest that fits a 3-char
+// value (e.g. '100') in the 216px container with default gaps.
+const CHART_HEADLINE_OPTS: DotTextOpts = { dotSize: 7, dotGap: 2, charGap: 8 }
 
 function rainTimesText(w: WeatherData): string {
-  return w.hourly.slice(0, RAIN_HOURS_VISIBLE).map(h => h.time).join('\n')
+  return w.hourly.slice(0, CHART_HOURS_VISIBLE).map(h => h.time).join('\n')
 }
 
 function rainBarsText(w: WeatherData): string {
-  return w.hourly.slice(0, RAIN_HOURS_VISIBLE).map(h => {
-    const filled = Math.max(0, Math.min(RAIN_BAR_CHARS, Math.round((h.precipProb / 100) * RAIN_BAR_CHARS)))
-    return '━'.repeat(filled) + '─'.repeat(RAIN_BAR_CHARS - filled)
+  return w.hourly.slice(0, CHART_HOURS_VISIBLE).map(h => {
+    const filled = Math.max(0, Math.min(CHART_BAR_CHARS, Math.round((h.precipProb / 100) * CHART_BAR_CHARS)))
+    return '━'.repeat(filled) + '─'.repeat(CHART_BAR_CHARS - filled)
   }).join('\n')
 }
 
 function rainPercentsText(w: WeatherData): string {
-  return w.hourly.slice(0, RAIN_HOURS_VISIBLE).map(h => `${h.precipProb}%`).join('\n')
+  return w.hourly.slice(0, CHART_HOURS_VISIBLE).map(h => `${h.precipProb}%`).join('\n')
 }
 
 
 async function showRainScreen(w: WeatherData): Promise<void> {
   const totalRaw = w.daily[0]?.precipSum ?? 0
-  const totalStr = totalRaw.toFixed(1)
+  // 1 decimal under 10 ("0.5"), integer at 10+ ("12", "999"). Always ≤ 3
+  // chars so we can pin the dotted font to a fixed dotSize via refText.
+  const totalStr = totalRaw < 10 ? totalRaw.toFixed(1) : Math.round(totalRaw).toString()
 
   await rebuildPage({
     containerTotalNum: 7,
@@ -521,10 +540,10 @@ async function showRainScreen(w: WeatherData): Promise<void> {
         containerID: 1,
         containerName: 'header',
         content: `${w.city.toLowerCase()}  \u00B7  ${w.currentTemp}\u00B0  \u00B7  ${w.currentDescription}`,
-        xPosition: RAIN_PAD,
+        xPosition: CHART_PAD,
         yPosition: 2,
-        width: DISPLAY_WIDTH - RAIN_PAD * 2,
-        height: RAIN_HEADER_H,
+        width: DISPLAY_WIDTH - CHART_PAD * 2,
+        height: CHART_HEADER_H,
         isEventCapture: 1,
         paddingLength: 4,
       }),
@@ -532,10 +551,10 @@ async function showRainScreen(w: WeatherData): Promise<void> {
         containerID: 2,
         containerName: 'times',
         content: rainTimesText(w),
-        xPosition: RAIN_TIMES_X,
-        yPosition: RAIN_BODY_Y,
-        width: RAIN_TIMES_W,
-        height: RAIN_BODY_H,
+        xPosition: CHART_TIMES_X,
+        yPosition: CHART_BODY_Y,
+        width: CHART_TIMES_W,
+        height: CHART_BODY_H,
         isEventCapture: 0,
         paddingLength: 4,
       }),
@@ -543,10 +562,10 @@ async function showRainScreen(w: WeatherData): Promise<void> {
         containerID: 3,
         containerName: 'bars',
         content: rainBarsText(w),
-        xPosition: RAIN_BARS_X,
-        yPosition: RAIN_BODY_Y,
-        width: RAIN_BARS_W,
-        height: RAIN_BODY_H,
+        xPosition: CHART_BARS_X,
+        yPosition: CHART_BODY_Y,
+        width: CHART_BARS_W,
+        height: CHART_BODY_H,
         isEventCapture: 0,
         paddingLength: 4,
       }),
@@ -554,10 +573,10 @@ async function showRainScreen(w: WeatherData): Promise<void> {
         containerID: 4,
         containerName: 'percents',
         content: rainPercentsText(w),
-        xPosition: RAIN_PERCENTS_X,
-        yPosition: RAIN_BODY_Y,
-        width: RAIN_PERCENTS_W,
-        height: RAIN_BODY_H,
+        xPosition: CHART_VALUES_X,
+        yPosition: CHART_BODY_Y,
+        width: CHART_VALUES_W,
+        height: CHART_BODY_H,
         isEventCapture: 0,
         paddingLength: 4,
       }),
@@ -565,10 +584,10 @@ async function showRainScreen(w: WeatherData): Promise<void> {
         containerID: 5,
         containerName: 'preciplabel',
         content: 'precipitation',
-        xPosition: RAIN_TOTAL_X,
-        yPosition: RAIN_PRECIP_LABEL_Y,
-        width: RAIN_TOTAL_W,
-        height: RAIN_PRECIP_LABEL_H,
+        xPosition: CHART_TOTAL_X,
+        yPosition: CHART_LABEL_TOP_Y,
+        width: CHART_TOTAL_W,
+        height: CHART_LABEL_TOP_H,
         isEventCapture: 0,
         paddingLength: 4,
       }),
@@ -576,10 +595,10 @@ async function showRainScreen(w: WeatherData): Promise<void> {
         containerID: 6,
         containerName: 'unit',
         content: `${precipUnit()} today`,
-        xPosition: RAIN_TOTAL_X,
-        yPosition: RAIN_LABEL_Y,
-        width: RAIN_TOTAL_W,
-        height: RAIN_LABEL_H,
+        xPosition: CHART_TOTAL_X,
+        yPosition: CHART_LABEL_BOT_Y,
+        width: CHART_TOTAL_W,
+        height: CHART_LABEL_BOT_H,
         isEventCapture: 0,
         paddingLength: 4,
       }),
@@ -588,45 +607,22 @@ async function showRainScreen(w: WeatherData): Promise<void> {
       new ImageContainerProperty({
         containerID: 7,
         containerName: 'total',
-        xPosition: RAIN_TOTAL_X,
-        yPosition: RAIN_TOTAL_Y,
-        width: RAIN_TOTAL_W,
-        height: RAIN_TOTAL_H,
+        xPosition: CHART_TOTAL_X,
+        yPosition: CHART_TOTAL_Y,
+        width: CHART_TOTAL_W,
+        height: CHART_TOTAL_H,
       }),
     ],
   })
 
-  await sendImage(renderDottedNumberBytes(totalStr, RAIN_TOTAL_W, RAIN_TOTAL_H), 7, 'total')
+  await sendImage(renderDottedNumberBytes(totalStr, CHART_TOTAL_W, CHART_TOTAL_H, CHART_HEADLINE_OPTS), 7, 'total')
   appendEventLog(`Screen: ${state.screen}`)
 }
 
 // ---------------------------------------------------------------------------
 // Screen 3 – Wind (Unicode bars + arrows, dotted current speed)
+// Layout uses the shared CHART_* constants defined above.
 // ---------------------------------------------------------------------------
-
-// Same column geometry as the rain screen so the screens read as a series.
-const WIND_PAD = 8
-const WIND_HEADER_H = 38
-const WIND_BODY_Y = WIND_HEADER_H + 4
-const WIND_BODY_H = DISPLAY_HEIGHT - WIND_BODY_Y - WIND_PAD
-const WIND_HOURS_VISIBLE = 8
-const WIND_BAR_CHARS = 8
-
-const WIND_TIMES_X = WIND_PAD
-const WIND_TIMES_W = 60
-const WIND_BARS_X = WIND_TIMES_X + WIND_TIMES_W + 4
-const WIND_BARS_W = 174
-const WIND_VALUES_X = WIND_BARS_X + WIND_BARS_W + 4
-const WIND_VALUES_W = 110
-const WIND_TOTAL_X = WIND_VALUES_X + WIND_VALUES_W + 12
-const WIND_TOTAL_W = DISPLAY_WIDTH - WIND_TOTAL_X - WIND_PAD
-
-const WIND_LABEL_TOP_Y = 50
-const WIND_LABEL_TOP_H = 36
-const WIND_TOTAL_Y = 90
-const WIND_TOTAL_H = 120
-const WIND_LABEL_BOT_Y = WIND_TOTAL_Y + WIND_TOTAL_H
-const WIND_LABEL_BOT_H = 36
 
 // Compass arrow points toward the direction the wind is FROM — matches the
 // existing windLabel convention ('sw' = wind from southwest). U+2190–U+2199
@@ -638,20 +634,20 @@ function windArrow(deg: number): string {
 }
 
 function windTimesText(w: WeatherData): string {
-  return w.hourly.slice(0, WIND_HOURS_VISIBLE).map(h => h.time).join('\n')
+  return w.hourly.slice(0, CHART_HOURS_VISIBLE).map(h => h.time).join('\n')
 }
 
 function windBarsText(w: WeatherData): string {
-  const hours = w.hourly.slice(0, WIND_HOURS_VISIBLE)
+  const hours = w.hourly.slice(0, CHART_HOURS_VISIBLE)
   const maxSpeed = Math.max(...hours.map(h => h.windGust), 1)
   return hours.map(h => {
-    const filled = Math.max(0, Math.min(WIND_BAR_CHARS, Math.round((h.windSpeed / maxSpeed) * WIND_BAR_CHARS)))
-    return '━'.repeat(filled) + '─'.repeat(WIND_BAR_CHARS - filled)
+    const filled = Math.max(0, Math.min(CHART_BAR_CHARS, Math.round((h.windSpeed / maxSpeed) * CHART_BAR_CHARS)))
+    return '━'.repeat(filled) + '─'.repeat(CHART_BAR_CHARS - filled)
   }).join('\n')
 }
 
 function windValuesText(w: WeatherData): string {
-  return w.hourly.slice(0, WIND_HOURS_VISIBLE).map(h =>
+  return w.hourly.slice(0, CHART_HOURS_VISIBLE).map(h =>
     `${h.windSpeed} ${windArrow(h.windDir)} ${windLabel(h.windDir)}`
   ).join('\n')
 }
@@ -667,10 +663,10 @@ async function showWindScreen(w: WeatherData): Promise<void> {
         containerID: 1,
         containerName: 'header',
         content: `${w.city.toLowerCase()}  ·  ${w.currentTemp}°  ·  ${w.currentDescription}`,
-        xPosition: WIND_PAD,
+        xPosition: CHART_PAD,
         yPosition: 2,
-        width: DISPLAY_WIDTH - WIND_PAD * 2,
-        height: WIND_HEADER_H,
+        width: DISPLAY_WIDTH - CHART_PAD * 2,
+        height: CHART_HEADER_H,
         isEventCapture: 1,
         paddingLength: 4,
       }),
@@ -678,10 +674,10 @@ async function showWindScreen(w: WeatherData): Promise<void> {
         containerID: 2,
         containerName: 'times',
         content: windTimesText(w),
-        xPosition: WIND_TIMES_X,
-        yPosition: WIND_BODY_Y,
-        width: WIND_TIMES_W,
-        height: WIND_BODY_H,
+        xPosition: CHART_TIMES_X,
+        yPosition: CHART_BODY_Y,
+        width: CHART_TIMES_W,
+        height: CHART_BODY_H,
         isEventCapture: 0,
         paddingLength: 4,
       }),
@@ -689,10 +685,10 @@ async function showWindScreen(w: WeatherData): Promise<void> {
         containerID: 3,
         containerName: 'bars',
         content: windBarsText(w),
-        xPosition: WIND_BARS_X,
-        yPosition: WIND_BODY_Y,
-        width: WIND_BARS_W,
-        height: WIND_BODY_H,
+        xPosition: CHART_BARS_X,
+        yPosition: CHART_BODY_Y,
+        width: CHART_BARS_W,
+        height: CHART_BODY_H,
         isEventCapture: 0,
         paddingLength: 4,
       }),
@@ -700,10 +696,10 @@ async function showWindScreen(w: WeatherData): Promise<void> {
         containerID: 4,
         containerName: 'values',
         content: windValuesText(w),
-        xPosition: WIND_VALUES_X,
-        yPosition: WIND_BODY_Y,
-        width: WIND_VALUES_W,
-        height: WIND_BODY_H,
+        xPosition: CHART_VALUES_X,
+        yPosition: CHART_BODY_Y,
+        width: CHART_VALUES_W,
+        height: CHART_BODY_H,
         isEventCapture: 0,
         paddingLength: 4,
       }),
@@ -711,10 +707,10 @@ async function showWindScreen(w: WeatherData): Promise<void> {
         containerID: 5,
         containerName: 'windlabel',
         content: 'wind',
-        xPosition: WIND_TOTAL_X,
-        yPosition: WIND_LABEL_TOP_Y,
-        width: WIND_TOTAL_W,
-        height: WIND_LABEL_TOP_H,
+        xPosition: CHART_TOTAL_X,
+        yPosition: CHART_LABEL_TOP_Y,
+        width: CHART_TOTAL_W,
+        height: CHART_LABEL_TOP_H,
         isEventCapture: 0,
         paddingLength: 4,
       }),
@@ -722,10 +718,10 @@ async function showWindScreen(w: WeatherData): Promise<void> {
         containerID: 6,
         containerName: 'unit',
         content: `${speedUnit()} ${currentArrow} ${windLabel(w.windDirection)}`,
-        xPosition: WIND_TOTAL_X,
-        yPosition: WIND_LABEL_BOT_Y,
-        width: WIND_TOTAL_W,
-        height: WIND_LABEL_BOT_H,
+        xPosition: CHART_TOTAL_X,
+        yPosition: CHART_LABEL_BOT_Y,
+        width: CHART_TOTAL_W,
+        height: CHART_LABEL_BOT_H,
         isEventCapture: 0,
         paddingLength: 4,
       }),
@@ -734,15 +730,15 @@ async function showWindScreen(w: WeatherData): Promise<void> {
       new ImageContainerProperty({
         containerID: 7,
         containerName: 'total',
-        xPosition: WIND_TOTAL_X,
-        yPosition: WIND_TOTAL_Y,
-        width: WIND_TOTAL_W,
-        height: WIND_TOTAL_H,
+        xPosition: CHART_TOTAL_X,
+        yPosition: CHART_TOTAL_Y,
+        width: CHART_TOTAL_W,
+        height: CHART_TOTAL_H,
       }),
     ],
   })
 
-  await sendImage(renderDottedNumberBytes(speedStr, WIND_TOTAL_W, WIND_TOTAL_H), 7, 'total')
+  await sendImage(renderDottedNumberBytes(speedStr, CHART_TOTAL_W, CHART_TOTAL_H, CHART_HEADLINE_OPTS), 7, 'total')
   appendEventLog(`Screen: ${state.screen}`)
 }
 

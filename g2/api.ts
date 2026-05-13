@@ -240,9 +240,15 @@ function applyTestOverrides(w: WeatherData): WeatherData {
   if (pressure !== undefined) w.pressure = Math.round(pressure)
   const precip = num('precip')
   if (precip !== undefined && w.daily[0]) w.daily[0].precipSum = precip
+  // hi/lo apply to every daily entry so the forecast screen can be stressed
+  // alongside Today. Use today_hi/today_lo to override just day 0.
   const hi = num('hi')
-  if (hi !== undefined && w.daily[0]) w.daily[0].tempMax = Math.round(hi)
+  if (hi !== undefined) w.daily.forEach(d => { d.tempMax = Math.round(hi) })
   const lo = num('lo')
-  if (lo !== undefined && w.daily[0]) w.daily[0].tempMin = Math.round(lo)
+  if (lo !== undefined) w.daily.forEach(d => { d.tempMin = Math.round(lo) })
+  const todayHi = num('today_hi')
+  if (todayHi !== undefined && w.daily[0]) w.daily[0].tempMax = Math.round(todayHi)
+  const todayLo = num('today_lo')
+  if (todayLo !== undefined && w.daily[0]) w.daily[0].tempMin = Math.round(todayLo)
   return w
 }
