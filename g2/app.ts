@@ -25,11 +25,42 @@ export async function refreshWeather(): Promise<void> {
 }
 
 let refreshInterval: ReturnType<typeof setInterval> | null = null
+let unsubscribeEvents: (() => void) | null = null
+
+function startRefreshLoop(): void {
+  if (refreshInterval) return
+  refreshInterval = setInterval(() => {
+    void refreshWeather()
+  }, 15 * 60_000)
+}
+
+function stopRefreshLoop(): void {
+  if (!refreshInterval) return
+  clearInterval(refreshInterval)
+  refreshInterval = null
+}
+
+export async function onForegroundEnter(): Promise<void> {
+  appendEventLog('Lifecycle: foreground enter')
+  startRefreshLoop()
+  if (getSavedCity()) {
+    await refreshWeather()
+  } else {
+    await showSetupMessage()
+  }
+}
+
+export function onAppExit(): void {
+  appendEventLog('Lifecycle: app exit – cleaning up')
+  stopRefreshLoop()
+  unsubscribeEvents?.()
+  unsubscribeEvents = null
+}
 
 export async function initApp(appBridge: EvenAppBridge): Promise<void> {
   setBridge(appBridge)
 
-  appBridge.onEvenHubEvent((event) => {
+  unsubscribeEvents = appBridge.onEvenHubEvent((event) => {
     onEvenHubEvent(event)
   })
 
@@ -44,9 +75,5 @@ export async function initApp(appBridge: EvenAppBridge): Promise<void> {
     await showSetupMessage()
   }
 
-  if (!refreshInterval) {
-    refreshInterval = setInterval(() => {
-      void refreshWeather()
-    }, 15 * 60_000)
-  }
+  startRefreshLoop()
 }

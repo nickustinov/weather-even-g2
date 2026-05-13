@@ -2,6 +2,7 @@ import { OsEventTypeList, type EvenHubEvent } from '@evenrealities/even_hub_sdk'
 import { appendEventLog } from '../_shared/log'
 import { getBridge, state } from './state'
 import { showScreen, nextScreen, prevScreen } from './renderer'
+import { onForegroundEnter, onAppExit } from './app'
 
 // Scroll cooldown to prevent duplicate actions from rapid swipes
 const SCROLL_COOLDOWN_MS = 300
@@ -22,11 +23,7 @@ export function resolveEventType(event: EvenHubEvent): OsEventTypeList | undefin
   const raw =
     event.listEvent?.eventType ??
     event.textEvent?.eventType ??
-    event.sysEvent?.eventType ??
-    ((event.jsonData ?? {}) as Record<string, unknown>).eventType ??
-    ((event.jsonData ?? {}) as Record<string, unknown>).event_type ??
-    ((event.jsonData ?? {}) as Record<string, unknown>).Event_Type ??
-    ((event.jsonData ?? {}) as Record<string, unknown>).type
+    event.sysEvent?.eventType
 
   if (typeof raw === 'number') {
     switch (raw) {
@@ -34,20 +31,16 @@ export function resolveEventType(event: EvenHubEvent): OsEventTypeList | undefin
       case 1: return OsEventTypeList.SCROLL_TOP_EVENT
       case 2: return OsEventTypeList.SCROLL_BOTTOM_EVENT
       case 3: return OsEventTypeList.DOUBLE_CLICK_EVENT
+      case 4: return OsEventTypeList.FOREGROUND_ENTER_EVENT
+      case 5: return OsEventTypeList.FOREGROUND_EXIT_EVENT
+      case 6: return OsEventTypeList.ABNORMAL_EXIT_EVENT
+      case 7: return OsEventTypeList.SYSTEM_EXIT_EVENT
       default: return undefined
     }
   }
 
-  if (typeof raw === 'string') {
-    const v = raw.toUpperCase()
-    if (v.includes('DOUBLE')) return OsEventTypeList.DOUBLE_CLICK_EVENT
-    if (v.includes('CLICK')) return OsEventTypeList.CLICK_EVENT
-    if (v.includes('SCROLL_TOP') || v.includes('UP')) return OsEventTypeList.SCROLL_TOP_EVENT
-    if (v.includes('SCROLL_BOTTOM') || v.includes('DOWN')) return OsEventTypeList.SCROLL_BOTTOM_EVENT
-  }
-
-  // CLICK_EVENT = 0 can be normalised to undefined by the SDK's fromJson.
-  // Any event from a container without a resolved type is treated as a click.
+  // Protobuf omits zero values, so eventType=0 (CLICK_EVENT) arrives as undefined.
+  // Treat any container event with no eventType as a single click.
   if (event.listEvent || event.textEvent || event.sysEvent) return OsEventTypeList.CLICK_EVENT
 
   return undefined
@@ -86,6 +79,16 @@ export function onEvenHubEvent(event: EvenHubEvent): void {
       // exit gesture, so invoke the host exit dialogue from anywhere.
       // This also satisfies the Even Hub submission requirement.
       void getBridge()?.shutDownPageContainer(1)
+      break
+
+    case OsEventTypeList.FOREGROUND_ENTER_EVENT:
+      void onForegroundEnter()
+      break
+
+    case OsEventTypeList.FOREGROUND_EXIT_EVENT:
+    case OsEventTypeList.ABNORMAL_EXIT_EVENT:
+    case OsEventTypeList.SYSTEM_EXIT_EVENT:
+      onAppExit()
       break
   }
 }
