@@ -1,41 +1,58 @@
-import { TextContainerProperty } from '@evenrealities/even_hub_sdk'
-import { DISPLAY_WIDTH, DISPLAY_HEIGHT } from '../layout'
-import { rebuildPage } from '../render-shared'
+import { ImageContainerProperty, TextContainerProperty } from '@evenrealities/even_hub_sdk'
+import { DISPLAY_WIDTH } from '../layout'
+import { canvasToBytes } from '../icons'
+import { drawWeatherIcon } from '../weather-icons'
+import { rebuildPage, sendImage } from '../render-shared'
+
+const SETUP_ICON_SIZE = 88
+// Text container is roughly sized to the rendered text width so the
+// left-aligned LVGL content sits visually centred under the icon. Width
+// estimated from firmware char widths (~10px each, 30 chars ≈ 300px).
+const SETUP_TEXT_W = 360
+const SETUP_TEXT_H = 40
+const SETUP_TEXT_TEXT = 'choose a city in the phone app'
 
 export async function showSetupMessage(): Promise<void> {
-  await rebuildPage({
-    containerTotalNum: 1,
-    textObject: [
-      new TextContainerProperty({
-        containerID: 1,
-        containerName: 'setup',
-        content: 'no city selected.\n\nopen weather in your phone browser and choose a city for the forecast.',
-        xPosition: 0,
-        yPosition: 0,
-        width: DISPLAY_WIDTH,
-        height: DISPLAY_HEIGHT,
-        isEventCapture: 1,
-        paddingLength: 6,
-      }),
-    ],
-  })
-}
+  const iconX = Math.floor((DISPLAY_WIDTH - SETUP_ICON_SIZE) / 2)
+  const iconY = 85
+  const textX = Math.floor((DISPLAY_WIDTH - SETUP_TEXT_W) / 2) + 40
+  const textY = iconY + SETUP_ICON_SIZE + 5
 
-export async function showLoading(): Promise<void> {
   await rebuildPage({
-    containerTotalNum: 1,
+    containerTotalNum: 2,
     textObject: [
       new TextContainerProperty({
         containerID: 1,
-        containerName: 'loading',
-        content: 'loading weather...',
-        xPosition: 0,
-        yPosition: 0,
-        width: DISPLAY_WIDTH,
-        height: DISPLAY_HEIGHT,
+        containerName: 'setupMsg',
+        content: SETUP_TEXT_TEXT,
+        xPosition: textX,
+        yPosition: textY,
+        width: SETUP_TEXT_W,
+        height: SETUP_TEXT_H,
         isEventCapture: 1,
         paddingLength: 4,
       }),
     ],
+    imageObject: [
+      new ImageContainerProperty({
+        containerID: 2,
+        containerName: 'setupIcon',
+        xPosition: iconX,
+        yPosition: iconY,
+        width: SETUP_ICON_SIZE,
+        height: SETUP_ICON_SIZE,
+      }),
+    ],
   })
+
+  // Render the phosphor sun (WMO 0) at the configured size and push.
+  const canvas = document.createElement('canvas')
+  canvas.width = SETUP_ICON_SIZE
+  canvas.height = SETUP_ICON_SIZE
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = '#000'
+  ctx.fillRect(0, 0, SETUP_ICON_SIZE, SETUP_ICON_SIZE)
+  await drawWeatherIcon(ctx, 0, SETUP_ICON_SIZE / 2, SETUP_ICON_SIZE / 2, SETUP_ICON_SIZE)
+  await sendImage(canvasToBytes(canvas), 2, 'setupIcon')
 }
+

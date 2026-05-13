@@ -17,9 +17,9 @@ import { showUvScreen } from './screens/uv'
 import { showSunScreen } from './screens/sun'
 import { showAirScreen } from './screens/air'
 import { showCityPickerScreen } from './screens/cities'
-import { showLoading, showSetupMessage } from './screens/idle'
+import { showSetupMessage } from './screens/idle'
 
-export { showLoading, showSetupMessage, showCityPickerScreen }
+export { showSetupMessage, showCityPickerScreen }
 
 export async function showScreen(): Promise<void> {
   if (state.modal === 'cities') {
@@ -27,7 +27,9 @@ export async function showScreen(): Promise<void> {
     return
   }
   if (!state.weather) {
-    await showLoading()
+    // No data yet (initial fetch in flight, or fetch failed). Render
+    // nothing — the previously-drawn page (if any) stays on the glasses
+    // until weather data arrives.
     return
   }
 

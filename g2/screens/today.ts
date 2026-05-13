@@ -19,7 +19,6 @@ import {
 } from '../render-shared'
 import type { DotTextOpts } from '../dot-digits'
 import { measureDotted } from '../dot-digits'
-import { showLoading } from './idle'
 
 const TODAY_PAD = 8
 const TODAY_HEADER_Y = 0
@@ -102,10 +101,7 @@ function todayStatValues(w: WeatherData, today: WeatherData['daily'][number]): s
 
 export async function showTodayScreen(w: WeatherData): Promise<void> {
   const today = w.daily[0]
-  if (!today) {
-    await showLoading()
-    return
-  }
+  if (!today) return
 
   const headlineText = `${w.currentTemp}°`
   const { x: conditionIconX, y: conditionIconY } = todayDegreePosition(w.currentTemp)

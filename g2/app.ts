@@ -2,7 +2,7 @@ import type { EvenAppBridge } from '@evenrealities/even_hub_sdk'
 import { appendEventLog } from '../_shared/log'
 import { fetchWeather, getSavedCity, getUnitPrefs, loadSettings } from './api'
 import { state, setBridge } from './state'
-import { showScreen, showLoading, showSetupMessage, firstScreen } from './renderer'
+import { showScreen, showSetupMessage, firstScreen } from './renderer'
 import { onEvenHubEvent } from './events'
 import { preloadWeatherIcons } from './weather-icons'
 
@@ -69,7 +69,6 @@ export async function initApp(appBridge: EvenAppBridge): Promise<void> {
 
   if (getSavedCity()) {
     appendEventLog('Weather: city found, loading forecast')
-    await showLoading()
     await refreshWeather()
   } else {
     appendEventLog('Weather: no city configured, showing setup message')
