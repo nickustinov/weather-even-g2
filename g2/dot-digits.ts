@@ -166,8 +166,8 @@ const GLYPHS: Record<string, Glyph> = {
     '...',
     '...',
     '...',
-    'OO.',
-    'OO.',
+    '.OO',
+    '.OO',
   ]},
   '°': { width: 4, rows: [
     '.OO.',

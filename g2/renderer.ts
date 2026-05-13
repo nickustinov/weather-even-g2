@@ -13,7 +13,6 @@ import { getSavedUnit } from './api'
 import { canvasToBytes } from './icons'
 import { drawWeatherIcon } from './weather-icons'
 import { autoSizeDotted, drawDotted, measureDotted } from './dot-digits'
-import umbrellaUrl from './assets/umbrella.png'
 import windIconUrl from './assets/wind.png'
 
 // ---------------------------------------------------------------------------
@@ -439,11 +438,6 @@ function windLabel(deg: number): string {
   return d[Math.round(deg / 45) % 8]
 }
 
-const NOW_ICON_SIZE = 100
-const NOW_ICON_PADDING_RIGHT = 20
-const NOW_LABEL_W = 120
-const NOW_VALUE_W = 300
-
 function speedUnit(): string {
   return getSavedUnit() === 'imperial' ? 'mph' : 'km/h'
 }
@@ -457,76 +451,6 @@ function formatPressure(hPa: number): string {
     return `${(hPa * 0.02953).toFixed(2)} inHg`
   }
   return `${hPa} hPa`
-}
-
-function nowLabels(): string {
-  return ['feels like', 'wind', 'humidity', 'pressure', '', 'sunrise', 'sunset'].join('\n')
-}
-
-function nowValues(w: WeatherData): string {
-  return [
-    `${w.feelsLike}\u00B0`,
-    `${w.windSpeed} ${speedUnit()} ${windLabel(w.windDirection)}`,
-    `${w.humidity}%`,
-    formatPressure(w.pressure),
-    '',
-    w.sunrise,
-    w.sunset,
-  ].join('\n')
-}
-
-async function showNowScreen(w: WeatherData): Promise<void> {
-  await rebuildPage({
-    containerTotalNum: 4,
-    textObject: [
-      new TextContainerProperty({
-        containerID: 1,
-        containerName: 'header',
-        content: `${w.city.toLowerCase()} \u00B7 ${w.currentTemp}\u00B0 \u00B7 ${w.currentDescription}`,
-        xPosition: 0,
-        yPosition: 0,
-        width: DISPLAY_WIDTH,
-        height: HEADER_H,
-        isEventCapture: 1,
-        paddingLength: 6,
-      }),
-      new TextContainerProperty({
-        containerID: 2,
-        containerName: 'labels',
-        content: nowLabels(),
-        xPosition: 0,
-        yPosition: COL_Y,
-        width: NOW_LABEL_W,
-        height: COL_H,
-        isEventCapture: 0,
-        paddingLength: 6,
-      }),
-      new TextContainerProperty({
-        containerID: 3,
-        containerName: 'values',
-        content: nowValues(w),
-        xPosition: NOW_LABEL_W,
-        yPosition: COL_Y,
-        width: NOW_VALUE_W,
-        height: COL_H,
-        isEventCapture: 0,
-        paddingLength: 6,
-      }),
-    ],
-    imageObject: [
-      new ImageContainerProperty({
-        containerID: 4,
-        containerName: 'icon',
-        xPosition: DISPLAY_WIDTH - NOW_ICON_SIZE - NOW_ICON_PADDING_RIGHT,
-        yPosition: Math.floor((DISPLAY_HEIGHT - NOW_ICON_SIZE) / 2),
-        width: NOW_ICON_SIZE,
-        height: NOW_ICON_SIZE,
-      }),
-    ],
-  })
-
-  await sendImage(await renderWeatherIconBytes(w.currentWmoCode, NOW_ICON_SIZE), 4, 'icon')
-  appendEventLog(`Screen: ${state.screen}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -547,15 +471,54 @@ function chartTimes(hours: WeatherData['hourly']): string {
   return hours.map((h, i) => i === 0 ? 'now' : h.time).join('\n')
 }
 
-function rainBars(hours: WeatherData['hourly']): string {
-  return hours.map(h => `${makeBar(h.precipProb)} ${h.precipProb}%`).join('\n')
-}
-
 function windBars(hours: WeatherData['hourly'], maxSpeed: number): string {
   return hours.map(h => {
     const pct = (h.windSpeed / maxSpeed) * 100
     return `${makeBar(pct)} ${h.windSpeed} ${windLabel(h.windDir)}`
   }).join('\n')
+}
+
+// Rain screen layout: header + 3-column hourly grid (times | bars | %) on the
+// left + dotted total stack (label / number / unit) on the right. Bars use
+// ━/─ Unicode chars. Times and percents go in their own containers because
+// the firmware font is proportional — 20:00 is wider than 13:00, so a single
+// container would misalign the bars.
+const RAIN_PAD = 8
+const RAIN_HEADER_H = 38
+const RAIN_BODY_Y = RAIN_HEADER_H + 4
+const RAIN_BODY_H = DISPLAY_HEIGHT - RAIN_BODY_Y - RAIN_PAD
+const RAIN_HOURS_VISIBLE = 8
+const RAIN_BAR_CHARS = 8
+
+const RAIN_TIMES_X = RAIN_PAD
+const RAIN_TIMES_W = 60
+const RAIN_BARS_X = RAIN_TIMES_X + RAIN_TIMES_W + 4
+const RAIN_BARS_W = 174
+const RAIN_PERCENTS_X = RAIN_BARS_X + RAIN_BARS_W + 4
+const RAIN_PERCENTS_W = 68
+const RAIN_TOTAL_X = RAIN_PERCENTS_X + RAIN_PERCENTS_W + 12
+const RAIN_TOTAL_W = DISPLAY_WIDTH - RAIN_TOTAL_X - RAIN_PAD
+
+const RAIN_PRECIP_LABEL_Y = 50
+const RAIN_PRECIP_LABEL_H = 36
+const RAIN_TOTAL_Y = 90
+const RAIN_TOTAL_H = 120
+const RAIN_LABEL_Y = RAIN_TOTAL_Y + RAIN_TOTAL_H
+const RAIN_LABEL_H = 36
+
+function rainTimesText(w: WeatherData): string {
+  return w.hourly.slice(0, RAIN_HOURS_VISIBLE).map(h => h.time).join('\n')
+}
+
+function rainBarsText(w: WeatherData): string {
+  return w.hourly.slice(0, RAIN_HOURS_VISIBLE).map(h => {
+    const filled = Math.max(0, Math.min(RAIN_BAR_CHARS, Math.round((h.precipProb / 100) * RAIN_BAR_CHARS)))
+    return '━'.repeat(filled) + '─'.repeat(RAIN_BAR_CHARS - filled)
+  }).join('\n')
+}
+
+function rainPercentsText(w: WeatherData): string {
+  return w.hourly.slice(0, RAIN_HOURS_VISIBLE).map(h => `${h.precipProb}%`).join('\n')
 }
 
 // Pre-loaded PNG icons for chart screens
@@ -588,66 +551,97 @@ async function loadPngIcon(url: string, width: number, height: number): Promise<
   return bytes
 }
 
-const UMBRELLA_W = 107
-const UMBRELLA_H = 100
 const WIND_ICON_W = 117
 const WIND_ICON_H = 93
 const BARS_COL_W = DISPLAY_WIDTH - TIME_COL_W
 
 async function showRainScreen(w: WeatherData): Promise<void> {
-  const hours = w.hourly.slice(0, 7)
-  const totalMm = hours.reduce((s, h) => s + h.precipMm, 0)
+  const totalRaw = w.daily[0]?.precipSum ?? 0
+  const totalStr = totalRaw.toFixed(1)
 
   await rebuildPage({
-    containerTotalNum: 4,
+    containerTotalNum: 7,
     textObject: [
       new TextContainerProperty({
         containerID: 1,
         containerName: 'header',
-        content: `precipitation \u00B7 ${Math.round(totalMm * 10) / 10} ${precipUnit()} next 12h`,
-        xPosition: 0,
-        yPosition: 0,
-        width: DISPLAY_WIDTH,
-        height: HEADER_H,
+        content: `${w.city.toLowerCase()}  \u00B7  ${w.currentTemp}\u00B0  \u00B7  ${w.currentDescription}`,
+        xPosition: RAIN_PAD,
+        yPosition: 2,
+        width: DISPLAY_WIDTH - RAIN_PAD * 2,
+        height: RAIN_HEADER_H,
         isEventCapture: 1,
-        paddingLength: 6,
+        paddingLength: 4,
       }),
       new TextContainerProperty({
         containerID: 2,
         containerName: 'times',
-        content: chartTimes(hours),
-        xPosition: 0,
-        yPosition: COL_Y,
-        width: TIME_COL_W,
-        height: COL_H,
+        content: rainTimesText(w),
+        xPosition: RAIN_TIMES_X,
+        yPosition: RAIN_BODY_Y,
+        width: RAIN_TIMES_W,
+        height: RAIN_BODY_H,
         isEventCapture: 0,
-        paddingLength: 6,
+        paddingLength: 4,
       }),
       new TextContainerProperty({
         containerID: 3,
         containerName: 'bars',
-        content: rainBars(hours),
-        xPosition: TIME_COL_W,
-        yPosition: COL_Y,
-        width: BARS_COL_W,
-        height: COL_H,
+        content: rainBarsText(w),
+        xPosition: RAIN_BARS_X,
+        yPosition: RAIN_BODY_Y,
+        width: RAIN_BARS_W,
+        height: RAIN_BODY_H,
         isEventCapture: 0,
-        paddingLength: 6,
+        paddingLength: 4,
+      }),
+      new TextContainerProperty({
+        containerID: 4,
+        containerName: 'percents',
+        content: rainPercentsText(w),
+        xPosition: RAIN_PERCENTS_X,
+        yPosition: RAIN_BODY_Y,
+        width: RAIN_PERCENTS_W,
+        height: RAIN_BODY_H,
+        isEventCapture: 0,
+        paddingLength: 4,
+      }),
+      new TextContainerProperty({
+        containerID: 5,
+        containerName: 'preciplabel',
+        content: 'precipitation',
+        xPosition: RAIN_TOTAL_X,
+        yPosition: RAIN_PRECIP_LABEL_Y,
+        width: RAIN_TOTAL_W,
+        height: RAIN_PRECIP_LABEL_H,
+        isEventCapture: 0,
+        paddingLength: 4,
+      }),
+      new TextContainerProperty({
+        containerID: 6,
+        containerName: 'unit',
+        content: `${precipUnit()} today`,
+        xPosition: RAIN_TOTAL_X,
+        yPosition: RAIN_LABEL_Y,
+        width: RAIN_TOTAL_W,
+        height: RAIN_LABEL_H,
+        isEventCapture: 0,
+        paddingLength: 4,
       }),
     ],
     imageObject: [
       new ImageContainerProperty({
-        containerID: 4,
-        containerName: 'label',
-        xPosition: DISPLAY_WIDTH - UMBRELLA_W - 10,
-        yPosition: Math.floor((DISPLAY_HEIGHT - UMBRELLA_H) / 2),
-        width: UMBRELLA_W,
-        height: UMBRELLA_H,
+        containerID: 7,
+        containerName: 'total',
+        xPosition: RAIN_TOTAL_X,
+        yPosition: RAIN_TOTAL_Y,
+        width: RAIN_TOTAL_W,
+        height: RAIN_TOTAL_H,
       }),
     ],
   })
 
-  await sendImage(await loadPngIcon(umbrellaUrl, UMBRELLA_W, UMBRELLA_H), 4, 'label')
+  await sendImage(renderDottedNumberBytes(totalStr, RAIN_TOTAL_W, RAIN_TOTAL_H), 7, 'total')
   appendEventLog(`Screen: ${state.screen}`)
 }
 
@@ -784,9 +778,6 @@ export async function showScreen(): Promise<void> {
       break
     case 'forecast':
       await showForecastScreen(state.weather)
-      break
-    case 'now':
-      await showNowScreen(state.weather)
       break
     case 'rain':
       await showRainScreen(state.weather)
