@@ -4,7 +4,9 @@
 // shared primitives are in ./render-shared. This file only owns the
 // state.screen → showXxxScreen() dispatch and the screen index nav helpers.
 
-import { state, SCREENS } from './state'
+import { state } from './state'
+import type { Screen } from './state'
+import { getScreenPrefs } from './api'
 import { showTodayScreen } from './screens/today'
 import { showForecastScreen } from './screens/forecast'
 import { showRainScreen } from './screens/rain'
@@ -55,17 +57,35 @@ export async function showScreen(): Promise<void> {
   }
 }
 
+// Effective screen list = user-ordered, only the enabled ones. Always
+// includes at least one entry (we enforce that on save) so navigation never
+// hits an empty array.
+function effectiveScreens(): Screen[] {
+  const enabled = getScreenPrefs().filter(p => p.enabled).map(p => p.id)
+  return enabled.length > 0 ? enabled : ['today']
+}
+
+function snapScreenIndex(list: Screen[]): number {
+  const idx = list.indexOf(state.screen)
+  return idx >= 0 ? idx : 0
+}
+
 export function nextScreen(): void {
-  state.screenIndex = (state.screenIndex + 1) % SCREENS.length
-  state.screen = SCREENS[state.screenIndex]
+  const list = effectiveScreens()
+  const cur = snapScreenIndex(list)
+  state.screenIndex = (cur + 1) % list.length
+  state.screen = list[state.screenIndex]
 }
 
 export function prevScreen(): void {
-  state.screenIndex = (state.screenIndex - 1 + SCREENS.length) % SCREENS.length
-  state.screen = SCREENS[state.screenIndex]
+  const list = effectiveScreens()
+  const cur = snapScreenIndex(list)
+  state.screenIndex = (cur - 1 + list.length) % list.length
+  state.screen = list[state.screenIndex]
 }
 
 export function firstScreen(): void {
+  const list = effectiveScreens()
   state.screenIndex = 0
-  state.screen = SCREENS[0]
+  state.screen = list[0]
 }

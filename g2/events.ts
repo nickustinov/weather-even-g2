@@ -60,15 +60,17 @@ export function onEvenHubEvent(event: EvenHubEvent): void {
       break
 
     case OsEventTypeList.SCROLL_BOTTOM_EVENT:
+      // Swipe down = next screen (matches the natural reading order).
       if (!scrollThrottled()) {
-        prevScreen()
+        nextScreen()
         void showScreen()
       }
       break
 
     case OsEventTypeList.SCROLL_TOP_EVENT:
+      // Swipe up = previous screen.
       if (!scrollThrottled()) {
-        nextScreen()
+        prevScreen()
         void showScreen()
       }
       break

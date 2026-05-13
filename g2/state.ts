@@ -77,6 +77,23 @@ export type WeatherData = {
 export const SCREENS = ['today', 'forecast', 'rain', 'wind', 'humidity', 'uv', 'air', 'sun', 'hours'] as const
 export type Screen = (typeof SCREENS)[number]
 
+export const SCREEN_LABELS: Record<Screen, string> = {
+  today: 'Today',
+  forecast: '10-day forecast',
+  rain: 'Rain',
+  wind: 'Wind',
+  humidity: 'Humidity',
+  uv: 'UV index',
+  air: 'Air quality',
+  sun: 'Sun & moon',
+  hours: 'Next hours',
+}
+
+// User preferences for the navigation carousel. Storage layer (api.ts) caches
+// these; renderer.ts reads them to derive the effective screen ring.
+export type ScreenPref = { id: Screen; enabled: boolean }
+export const DEFAULT_SCREEN_PREFS: ScreenPref[] = SCREENS.map(id => ({ id, enabled: true }))
+
 export type State = {
   screen: Screen
   screenIndex: number

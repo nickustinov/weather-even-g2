@@ -1,16 +1,19 @@
 import type { EvenAppBridge } from '@evenrealities/even_hub_sdk'
-import type { AirQuality, City, Pollen, UnitSystem, WeatherData, HourlyPoint, DailyPoint } from './state'
-import { getBridge } from './state'
+import type { AirQuality, City, Pollen, ScreenPref, Screen, UnitSystem, WeatherData, HourlyPoint, DailyPoint } from './state'
+import { DEFAULT_SCREEN_PREFS, SCREENS, getBridge } from './state'
 import { appendEventLog } from '../_shared/log'
 
 const CITY_KEY = 'weather:city'
 const UNIT_KEY = 'weather:unit'
+const SCREENS_KEY = 'weather:screens'
 
 // --- Settings (SDK local storage + memory cache) ---
 
 let cachedCity: City | null = null
 let cachedUnit: UnitSystem = 'metric'
+let cachedScreenPrefs: ScreenPref[] = DEFAULT_SCREEN_PREFS.slice()
 const settingsListeners: Array<() => void> = []
+const screenPrefsListeners: Array<() => void> = []
 
 export function onSettingsLoaded(cb: () => void): void {
   settingsListeners.push(cb)
@@ -32,8 +35,51 @@ export async function loadSettings(b: EvenAppBridge): Promise<void> {
     await b.setLocalStorage(UNIT_KEY, cachedUnit)
   }
 
+  const rawScreens = await b.getLocalStorage(SCREENS_KEY)
+  if (rawScreens) {
+    try {
+      const parsed = JSON.parse(rawScreens) as ScreenPref[]
+      cachedScreenPrefs = mergeScreenPrefs(parsed)
+    } catch { /* ignore parse errors, keep defaults */ }
+  }
+
   appendEventLog(`Settings: city=${cachedCity?.name ?? 'none'} unit=${cachedUnit}`)
   for (const cb of settingsListeners) cb()
+  for (const cb of screenPrefsListeners) cb()
+}
+
+// Reconciles persisted prefs with the current SCREENS catalog: keeps any
+// stored entry that matches a current screen (preserving order + enabled),
+// appends any new screens added in code, and drops removed ones.
+function mergeScreenPrefs(stored: ScreenPref[]): ScreenPref[] {
+  const catalog = new Set<Screen>(SCREENS)
+  const merged: ScreenPref[] = []
+  const seen = new Set<Screen>()
+  for (const p of stored) {
+    if (catalog.has(p.id) && !seen.has(p.id)) {
+      merged.push({ id: p.id, enabled: !!p.enabled })
+      seen.add(p.id)
+    }
+  }
+  for (const id of SCREENS) {
+    if (!seen.has(id)) merged.push({ id, enabled: true })
+  }
+  return merged
+}
+
+export function getScreenPrefs(): ScreenPref[] {
+  return cachedScreenPrefs
+}
+
+export async function saveScreenPrefs(prefs: ScreenPref[]): Promise<void> {
+  cachedScreenPrefs = mergeScreenPrefs(prefs)
+  const b = getBridge()
+  if (b) await b.setLocalStorage(SCREENS_KEY, JSON.stringify(cachedScreenPrefs))
+  for (const cb of screenPrefsListeners) cb()
+}
+
+export function onScreenPrefsChanged(cb: () => void): void {
+  screenPrefsListeners.push(cb)
 }
 
 export function getSavedCity(): City | null {
