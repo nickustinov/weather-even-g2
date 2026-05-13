@@ -13,7 +13,6 @@ import { getSavedUnit } from './api'
 import { canvasToBytes } from './icons'
 import { drawWeatherIcon } from './weather-icons'
 import { autoSizeDotted, drawDotted, measureDotted } from './dot-digits'
-import windIconUrl from './assets/wind.png'
 
 // ---------------------------------------------------------------------------
 // Rebuild helper
@@ -457,27 +456,6 @@ function formatPressure(hPa: number): string {
 // Screen 2 – Precipitation (horizontal bar chart)
 // ---------------------------------------------------------------------------
 
-const BAR_WIDTH = 12
-
-function makeBar(pct: number): string {
-  const filled = Math.round((pct / 100) * BAR_WIDTH)
-  const empty = BAR_WIDTH - filled
-  return '\u2588'.repeat(filled) + '\u2592'.repeat(empty)
-}
-
-const TIME_COL_W = 80
-
-function chartTimes(hours: WeatherData['hourly']): string {
-  return hours.map((h, i) => i === 0 ? 'now' : h.time).join('\n')
-}
-
-function windBars(hours: WeatherData['hourly'], maxSpeed: number): string {
-  return hours.map(h => {
-    const pct = (h.windSpeed / maxSpeed) * 100
-    return `${makeBar(pct)} ${h.windSpeed} ${windLabel(h.windDir)}`
-  }).join('\n')
-}
-
 // Rain screen layout: header + 3-column hourly grid (times | bars | %) on the
 // left + dotted total stack (label / number / unit) on the right. Bars use
 // ━/─ Unicode chars. Times and percents go in their own containers because
@@ -521,39 +499,6 @@ function rainPercentsText(w: WeatherData): string {
   return w.hourly.slice(0, RAIN_HOURS_VISIBLE).map(h => `${h.precipProb}%`).join('\n')
 }
 
-// Pre-loaded PNG icons for chart screens
-const iconCache = new Map<string, number[]>()
-
-function loadImage(url: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => resolve(img)
-    img.onerror = reject
-    img.src = url
-  })
-}
-
-async function loadPngIcon(url: string, width: number, height: number): Promise<number[]> {
-  const cached = iconCache.get(url)
-  if (cached) return cached
-
-  const img = await loadImage(url)
-  const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
-  const ctx = canvas.getContext('2d')!
-  ctx.fillStyle = '#000'
-  ctx.fillRect(0, 0, width, height)
-  ctx.drawImage(img, 0, 0, width, height)
-  const bytes = canvasToBytes(canvas)
-
-  iconCache.set(url, bytes)
-  return bytes
-}
-
-const WIND_ICON_W = 117
-const WIND_ICON_H = 93
-const BARS_COL_W = DISPLAY_WIDTH - TIME_COL_W
 
 async function showRainScreen(w: WeatherData): Promise<void> {
   const totalRaw = w.daily[0]?.precipSum ?? 0
@@ -646,63 +591,148 @@ async function showRainScreen(w: WeatherData): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Screen 3 – Wind (horizontal bar chart)
+// Screen 3 – Wind (Unicode bars + arrows, dotted current speed)
 // ---------------------------------------------------------------------------
 
-async function showWindScreen(w: WeatherData): Promise<void> {
-  const hours = w.hourly.slice(0, 7)
+// Same column geometry as the rain screen so the screens read as a series.
+const WIND_PAD = 8
+const WIND_HEADER_H = 38
+const WIND_BODY_Y = WIND_HEADER_H + 4
+const WIND_BODY_H = DISPLAY_HEIGHT - WIND_BODY_Y - WIND_PAD
+const WIND_HOURS_VISIBLE = 8
+const WIND_BAR_CHARS = 8
+
+const WIND_TIMES_X = WIND_PAD
+const WIND_TIMES_W = 60
+const WIND_BARS_X = WIND_TIMES_X + WIND_TIMES_W + 4
+const WIND_BARS_W = 174
+const WIND_VALUES_X = WIND_BARS_X + WIND_BARS_W + 4
+const WIND_VALUES_W = 110
+const WIND_TOTAL_X = WIND_VALUES_X + WIND_VALUES_W + 12
+const WIND_TOTAL_W = DISPLAY_WIDTH - WIND_TOTAL_X - WIND_PAD
+
+const WIND_LABEL_TOP_Y = 50
+const WIND_LABEL_TOP_H = 36
+const WIND_TOTAL_Y = 90
+const WIND_TOTAL_H = 120
+const WIND_LABEL_BOT_Y = WIND_TOTAL_Y + WIND_TOTAL_H
+const WIND_LABEL_BOT_H = 36
+
+// Compass arrow points toward the direction the wind is FROM — matches the
+// existing windLabel convention ('sw' = wind from southwest). U+2190–U+2199
+// arrows are confirmed in the firmware font (even-g2-notes display.md).
+const WIND_ARROWS = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖']
+
+function windArrow(deg: number): string {
+  return WIND_ARROWS[Math.round(deg / 45) % 8]
+}
+
+function windTimesText(w: WeatherData): string {
+  return w.hourly.slice(0, WIND_HOURS_VISIBLE).map(h => h.time).join('\n')
+}
+
+function windBarsText(w: WeatherData): string {
+  const hours = w.hourly.slice(0, WIND_HOURS_VISIBLE)
   const maxSpeed = Math.max(...hours.map(h => h.windGust), 1)
+  return hours.map(h => {
+    const filled = Math.max(0, Math.min(WIND_BAR_CHARS, Math.round((h.windSpeed / maxSpeed) * WIND_BAR_CHARS)))
+    return '━'.repeat(filled) + '─'.repeat(WIND_BAR_CHARS - filled)
+  }).join('\n')
+}
+
+function windValuesText(w: WeatherData): string {
+  return w.hourly.slice(0, WIND_HOURS_VISIBLE).map(h =>
+    `${h.windSpeed} ${windArrow(h.windDir)} ${windLabel(h.windDir)}`
+  ).join('\n')
+}
+
+async function showWindScreen(w: WeatherData): Promise<void> {
+  const speedStr = String(w.windSpeed)
+  const currentArrow = windArrow(w.windDirection)
 
   await rebuildPage({
-    containerTotalNum: 4,
+    containerTotalNum: 7,
     textObject: [
       new TextContainerProperty({
         containerID: 1,
         containerName: 'header',
-        content: `wind \u00B7 ${w.windSpeed} ${speedUnit()} ${windLabel(w.windDirection)}`,
-        xPosition: 0,
-        yPosition: 0,
-        width: DISPLAY_WIDTH,
-        height: HEADER_H,
+        content: `${w.city.toLowerCase()}  ·  ${w.currentTemp}°  ·  ${w.currentDescription}`,
+        xPosition: WIND_PAD,
+        yPosition: 2,
+        width: DISPLAY_WIDTH - WIND_PAD * 2,
+        height: WIND_HEADER_H,
         isEventCapture: 1,
-        paddingLength: 6,
+        paddingLength: 4,
       }),
       new TextContainerProperty({
         containerID: 2,
         containerName: 'times',
-        content: chartTimes(hours),
-        xPosition: 0,
-        yPosition: COL_Y,
-        width: TIME_COL_W,
-        height: COL_H,
+        content: windTimesText(w),
+        xPosition: WIND_TIMES_X,
+        yPosition: WIND_BODY_Y,
+        width: WIND_TIMES_W,
+        height: WIND_BODY_H,
         isEventCapture: 0,
-        paddingLength: 6,
+        paddingLength: 4,
       }),
       new TextContainerProperty({
         containerID: 3,
         containerName: 'bars',
-        content: windBars(hours, maxSpeed),
-        xPosition: TIME_COL_W,
-        yPosition: COL_Y,
-        width: BARS_COL_W,
-        height: COL_H,
+        content: windBarsText(w),
+        xPosition: WIND_BARS_X,
+        yPosition: WIND_BODY_Y,
+        width: WIND_BARS_W,
+        height: WIND_BODY_H,
         isEventCapture: 0,
-        paddingLength: 6,
+        paddingLength: 4,
+      }),
+      new TextContainerProperty({
+        containerID: 4,
+        containerName: 'values',
+        content: windValuesText(w),
+        xPosition: WIND_VALUES_X,
+        yPosition: WIND_BODY_Y,
+        width: WIND_VALUES_W,
+        height: WIND_BODY_H,
+        isEventCapture: 0,
+        paddingLength: 4,
+      }),
+      new TextContainerProperty({
+        containerID: 5,
+        containerName: 'windlabel',
+        content: 'wind',
+        xPosition: WIND_TOTAL_X,
+        yPosition: WIND_LABEL_TOP_Y,
+        width: WIND_TOTAL_W,
+        height: WIND_LABEL_TOP_H,
+        isEventCapture: 0,
+        paddingLength: 4,
+      }),
+      new TextContainerProperty({
+        containerID: 6,
+        containerName: 'unit',
+        content: `${speedUnit()} ${currentArrow} ${windLabel(w.windDirection)}`,
+        xPosition: WIND_TOTAL_X,
+        yPosition: WIND_LABEL_BOT_Y,
+        width: WIND_TOTAL_W,
+        height: WIND_LABEL_BOT_H,
+        isEventCapture: 0,
+        paddingLength: 4,
       }),
     ],
     imageObject: [
       new ImageContainerProperty({
-        containerID: 4,
-        containerName: 'label',
-        xPosition: DISPLAY_WIDTH - WIND_ICON_W - 10,
-        yPosition: Math.floor((DISPLAY_HEIGHT - WIND_ICON_H) / 2),
-        width: WIND_ICON_W,
-        height: WIND_ICON_H,
+        containerID: 7,
+        containerName: 'total',
+        xPosition: WIND_TOTAL_X,
+        yPosition: WIND_TOTAL_Y,
+        width: WIND_TOTAL_W,
+        height: WIND_TOTAL_H,
       }),
     ],
   })
 
-  await sendImage(await loadPngIcon(windIconUrl, WIND_ICON_W, WIND_ICON_H), 4, 'label')
+  await sendImage(renderDottedNumberBytes(speedStr, WIND_TOTAL_W, WIND_TOTAL_H), 7, 'total')
   appendEventLog(`Screen: ${state.screen}`)
 }
 
