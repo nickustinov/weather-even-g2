@@ -44,7 +44,9 @@ function loadIcon(key: IconKey): Promise<HTMLImageElement> {
   const loading = loadingCache.get(key)
   if (loading) return loading
 
-  const svg = SVGS[key].replace(/currentColor/g, '#ffffff')
+  // Dim icons to ~60% brightness (#999) so they sit behind the brighter
+  // dotted text + headline instead of competing for visual weight.
+  const svg = SVGS[key].replace(/currentColor/g, '#999999')
   const dataUrl = `data:image/svg+xml;base64,${btoa(svg)}`
 
   const promise = new Promise<HTMLImageElement>((resolve, reject) => {

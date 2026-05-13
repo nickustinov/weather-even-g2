@@ -73,7 +73,7 @@ export function renderDottedNumberBytes(text: string, w: number, h: number, fixe
   const ctx = canvas.getContext('2d')!
   ctx.fillStyle = '#000'
   ctx.fillRect(0, 0, w, h)
-  ctx.fillStyle = '#fff'
+  ctx.fillStyle = '#999'
   // Left-aligned so the headline lines up visually with subtitles below.
   const x = 4
   const y = Math.floor((h - m.height) / 2)
@@ -128,6 +128,10 @@ export function formatPressure(hPa: number): string {
 export const DAYS_SHORT = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 export const MONTHS_SHORT = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
 
+export function todayDateString(d: Date = new Date()): string {
+  return `${DAYS_SHORT[d.getDay()]} ${d.getDate()}`
+}
+
 export function timeToMinutes(hhmm: string): number {
   const parts = hhmm.split(':')
   if (parts.length !== 2) return 0
@@ -139,6 +143,27 @@ export function formatHm(mins: number): string {
   const m = mins % 60
   if (h === 0) return `${m}m`
   return `${h}h ${m}m`
+}
+
+export function dayProgress(sunrise: string, sunset: string): number {
+  const now = new Date()
+  const nowMin = now.getHours() * 60 + now.getMinutes()
+  const sunMin = timeToMinutes(sunrise)
+  const setMin = timeToMinutes(sunset)
+  if (setMin <= sunMin) return 0
+  if (nowMin <= sunMin) return 0
+  if (nowMin >= setMin) return 1
+  return (nowMin - sunMin) / (setMin - sunMin)
+}
+
+export function daylightRemaining(sunrise: string, sunset: string): string {
+  const now = new Date()
+  const nowMin = now.getHours() * 60 + now.getMinutes()
+  const sunMin = timeToMinutes(sunrise)
+  const setMin = timeToMinutes(sunset)
+  if (nowMin < sunMin) return formatHm(setMin - sunMin)
+  if (nowMin >= setMin) return '0m'
+  return formatHm(setMin - nowMin)
 }
 
 // ---------------------------------------------------------------------------
@@ -165,14 +190,18 @@ export const CHART_VALUES_W = 90
 export const CHART_TOTAL_X = CHART_VALUES_X + CHART_VALUES_W + 12
 export const CHART_TOTAL_W = 576 - CHART_TOTAL_X - CHART_PAD
 
-export const CHART_LABEL_TOP_Y = 50
+// Top label nudged 6px down, bottom label nudged 14px up (closer to number)
+// since the dotted glyph is much narrower than its container and the bottom
+// has more visible empty space.
+export const CHART_LABEL_TOP_Y = 56
 export const CHART_LABEL_TOP_H = 36
 export const CHART_TOTAL_Y = 90
 export const CHART_TOTAL_H = 120
-export const CHART_LABEL_BOT_Y = CHART_TOTAL_Y + CHART_TOTAL_H
+export const CHART_LABEL_BOT_Y = CHART_TOTAL_Y + CHART_TOTAL_H - 14
 export const CHART_LABEL_BOT_H = 36
 
-// Pinned dotSize so the headline number renders at the same visual size on
-// rain and wind regardless of value. d=7 is the largest that fits a 3-char
-// value (e.g. '100') in the 216px container with default gaps.
-export const CHART_HEADLINE_OPTS: DotTextOpts = { dotSize: 7, dotGap: 2, charGap: 8 }
+// Pinned mini-dot size so the headline renders at the same visual size on
+// rain and wind. With cellGap=1 the macro cells are visually separated.
+// Macro cell = 3*2 + 2*1 = 8, glyph = 6*8 + 5*1 = 53, '100' = 3*53 + 2*2 +
+// 2*1 (cellGap is intra-glyph, already counted) = 163px in the 204 area.
+export const CHART_HEADLINE_OPTS: DotTextOpts = { dotSize: 2, dotGap: 1, cellGap: 1, charGap: 12 }

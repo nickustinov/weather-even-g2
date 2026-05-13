@@ -7,18 +7,18 @@ import { DISPLAY_WIDTH, DISPLAY_HEIGHT } from '../layout'
 import { state } from '../state'
 import type { WeatherData } from '../state'
 import {
-  DAYS_SHORT,
-  MONTHS_SHORT,
-  formatHm,
+  daylightRemaining,
   formatPressure,
   rebuildPage,
   renderDottedNumberBytes,
   renderWeatherIconBytes,
   sendImage,
   speedUnit,
-  timeToMinutes,
+  todayDateString,
   windLabel,
 } from '../render-shared'
+import type { DotTextOpts } from '../dot-digits'
+import { measureDotted } from '../dot-digits'
 import { showLoading } from './idle'
 
 const TODAY_PAD = 8
@@ -47,36 +47,40 @@ const TODAY_STAT_LABEL_W = 90
 const TODAY_STAT_VALUE_X = TODAY_RIGHT_X + TODAY_STAT_LABEL_W
 const TODAY_STAT_VALUE_W = TODAY_RIGHT_W - TODAY_STAT_LABEL_W
 
-// Condition icon sits directly under the degree glyph of the headline.
-// 2-char temps render with bigger dotSize → digits extend lower → icon needs
-// to drop too. Each extra char (3-digit or negative) shrinks dotSize and the
-// icon should rise to stay snug against the digit baseline, and shift right
-// by ~55px in the rendered dotted font.
-const TODAY_CONDITION_ICON_SIZE = 61
-const TODAY_CONDITION_ICON_X_BASE = TODAY_TEMP_X + 156
-const TODAY_CONDITION_ICON_Y_BASE = TODAY_TEMP_Y + 66
-const TODAY_CONDITION_ICON_PER_EXTRA_CHAR_X = 55
-const TODAY_CONDITION_ICON_PER_EXTRA_CHAR_Y = 5
+const TODAY_CONDITION_ICON_SIZE = 48
 
-function todayHeader(w: WeatherData): string {
-  const d = new Date()
-  const date = `${DAYS_SHORT[d.getDay()]} ${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`
-  return `${w.city.toLowerCase()}  ·  ${date}  ·  ${w.currentDescription.toLowerCase()}`
+// Today's headline is slightly larger than the chart screens but still fixed
+// so swiping between values doesn't rescale. d=3 macro cell = 11px, '100°'
+// renders at ~245px which fits the 260px content area.
+const TODAY_HEADLINE_OPTS: DotTextOpts = { dotSize: 3, dotGap: 1, cellGap: 1, charGap: 12 }
+
+// Computes the screen position of the ° glyph in the rendered headline, used
+// to anchor the condition icon. With the dotted font's per-glyph widths
+// (digit=6 cells, '1'=4 cells, °=4 cells) the offset isn't a clean per-char
+// constant — we measure the prefix exactly using the same opts autoSize
+// picks at render time.
+function todayDegreePosition(temp: number): { x: number; y: number } {
+  const text = `${temp}°`
+  const charGap = TODAY_HEADLINE_OPTS.charGap ?? 3
+  const prefix = text.slice(0, -1)
+  const prefixWidth = measureDotted(prefix, TODAY_HEADLINE_OPTS).width
+  const measured = measureDotted(text, TODAY_HEADLINE_OPTS)
+  // renderDottedNumberBytes draws at x=4 inside the temp canvas, vertically
+  // centered. Icon sits below the visible glyph bounds.
+  const yOffset = Math.floor((TODAY_TEMP_H - measured.height) / 2)
+  return {
+    x: TODAY_TEMP_X + 4 + prefixWidth + charGap - 6,
+    y: TODAY_TEMP_Y + yOffset + measured.height - 28,
+  }
 }
 
-function daylightValue(sunrise: string, sunset: string): string {
-  const now = new Date()
-  const nowMin = now.getHours() * 60 + now.getMinutes()
-  const sunMin = timeToMinutes(sunrise)
-  const setMin = timeToMinutes(sunset)
-  if (nowMin < sunMin) return formatHm(setMin - sunMin)
-  if (nowMin >= setMin) return '0m'
-  return formatHm(setMin - nowMin)
+function todayHeader(w: WeatherData): string {
+  return `${w.city.toLowerCase()}  ·  ${todayDateString()}  ·  ${w.currentDescription.toLowerCase()}`
 }
 
 function todayRangeAndDaylight(today: WeatherData['daily'][number], w: WeatherData): string {
   const range = `↑ ${today.tempMax}°    ↓ ${today.tempMin}°`
-  const daylight = `${daylightValue(w.sunrise, w.sunset)} daylight left`
+  const daylight = `${daylightRemaining(w.sunrise, w.sunset)} daylight left`
   return `${range}\n${daylight}`
 }
 
@@ -104,9 +108,7 @@ export async function showTodayScreen(w: WeatherData): Promise<void> {
   }
 
   const headlineText = `${w.currentTemp}°`
-  const extraChars = Math.max(0, String(w.currentTemp).length - 2)
-  const conditionIconX = TODAY_CONDITION_ICON_X_BASE + extraChars * TODAY_CONDITION_ICON_PER_EXTRA_CHAR_X
-  const conditionIconY = TODAY_CONDITION_ICON_Y_BASE - extraChars * TODAY_CONDITION_ICON_PER_EXTRA_CHAR_Y
+  const { x: conditionIconX, y: conditionIconY } = todayDegreePosition(w.currentTemp)
 
   await rebuildPage({
     containerTotalNum: 6,
@@ -176,7 +178,7 @@ export async function showTodayScreen(w: WeatherData): Promise<void> {
     ],
   })
 
-  await sendImage(renderDottedNumberBytes(headlineText, TODAY_TEMP_W, TODAY_TEMP_H), 5, 'headline')
+  await sendImage(renderDottedNumberBytes(headlineText, TODAY_TEMP_W, TODAY_TEMP_H, TODAY_HEADLINE_OPTS), 5, 'headline')
   await sendImage(await renderWeatherIconBytes(w.currentWmoCode, TODAY_CONDITION_ICON_SIZE), 6, 'condition')
   appendEventLog(`Screen: ${state.screen}`)
 }

@@ -32,6 +32,7 @@ import {
   rebuildPage,
   renderDottedNumberBytes,
   sendImage,
+  todayDateString,
 } from '../render-shared'
 
 function rainTimesText(w: WeatherData): string {
@@ -69,7 +70,7 @@ export async function showRainScreen(w: WeatherData): Promise<void> {
       new TextContainerProperty({
         containerID: 1,
         containerName: 'header',
-        content: `${w.city.toLowerCase()}  ·  ${w.currentTemp}°  ·  ${rainPeakLine(w)}`,
+        content: `${w.city.toLowerCase()}  ·  ${w.currentTemp}°  ·  ${todayDateString()}  ·  ${rainPeakLine(w)}`,
         xPosition: CHART_PAD,
         yPosition: 2,
         width: DISPLAY_WIDTH - CHART_PAD * 2,

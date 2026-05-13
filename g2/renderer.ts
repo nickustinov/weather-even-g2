@@ -10,6 +10,7 @@ import { showForecastScreen } from './screens/forecast'
 import { showRainScreen } from './screens/rain'
 import { showWindScreen } from './screens/wind'
 import { showHoursScreen } from './screens/hours'
+import { showSunScreen } from './screens/sun'
 import { showLoading, showSetupMessage } from './screens/idle'
 
 export { showLoading, showSetupMessage }
@@ -35,6 +36,9 @@ export async function showScreen(): Promise<void> {
       break
     case 'hours':
       await showHoursScreen(state.weather)
+      break
+    case 'sun':
+      await showSunScreen(state.weather)
       break
   }
 }

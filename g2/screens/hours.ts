@@ -8,7 +8,7 @@ import { canvasToBytes } from '../icons'
 import { state } from '../state'
 import type { HourlyPoint, WeatherData } from '../state'
 import { drawWeatherIcon } from '../weather-icons'
-import { rebuildPage, sendImage } from '../render-shared'
+import { rebuildPage, sendImage, todayDateString } from '../render-shared'
 
 // Vertical 2-column hourly forecast. Each column shows 8 hours with one
 // text container per data type (times / temps / percents) and 2 image
@@ -161,7 +161,7 @@ export async function showHoursScreen(w: WeatherData): Promise<void> {
       new TextContainerProperty({
         containerID: HEADER_ID,
         containerName: 'header',
-        content: `${w.city.toLowerCase()}  ·  ${w.currentTemp}°  ·  ${w.currentDescription}`,
+        content: `${w.city.toLowerCase()}  ·  ${w.currentTemp}°  ·  ${todayDateString()}  ·  ${w.currentDescription}`,
         xPosition: 8,
         yPosition: 2,
         width: DISPLAY_WIDTH - 16,

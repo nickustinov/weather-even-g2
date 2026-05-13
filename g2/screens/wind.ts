@@ -32,6 +32,7 @@ import {
   renderDottedNumberBytes,
   sendImage,
   speedUnit,
+  todayDateString,
   windLabel,
 } from '../render-shared'
 
@@ -73,7 +74,7 @@ export async function showWindScreen(w: WeatherData): Promise<void> {
       new TextContainerProperty({
         containerID: 1,
         containerName: 'header',
-        content: `${w.city.toLowerCase()}  ·  ${w.currentTemp}°  ·  wind gusts ${w.windGust} ${speedUnit()}`,
+        content: `${w.city.toLowerCase()}  ·  ${w.currentTemp}°  ·  ${todayDateString()}  ·  wind gusts ${w.windGust} ${speedUnit()}`,
         xPosition: CHART_PAD,
         yPosition: 2,
         width: DISPLAY_WIDTH - CHART_PAD * 2,

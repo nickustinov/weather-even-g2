@@ -50,7 +50,7 @@ export type WeatherData = {
   daily: DailyPoint[]
 }
 
-export const SCREENS = ['today', 'forecast', 'rain', 'wind', 'hours'] as const
+export const SCREENS = ['today', 'forecast', 'rain', 'wind', 'hours', 'sun'] as const
 export type Screen = (typeof SCREENS)[number]
 
 export type State = {
