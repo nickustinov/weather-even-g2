@@ -51,13 +51,13 @@ const GLYPHS: Record<string, Glyph> = {
     '.OOOO.',
   ]},
   '3': { width: 6, rows: [
-    '.OOOO.',
+    'OOOOO.',
     '.....O',
     '.....O',
     '.OOOOO ',
     '.....O',
     '.....O',
-    '.OOOO.',
+    'OOOOO.',
   ]},
   '4': { width: 6, rows: [
     'O....O',

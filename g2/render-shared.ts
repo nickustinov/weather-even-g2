@@ -205,7 +205,9 @@ export const CHART_LABEL_TOP_Y = CHART_TOTAL_Y - 28 - CHART_LABEL_GAP
 export const CHART_LABEL_BOT_H = 36
 // digit_bot = CHART_TOTAL_Y + CHART_TOTAL_H - 3, text_top = BOT_Y + 4
 // → BOT_Y = (CHART_TOTAL_Y + CHART_TOTAL_H - 3) + CHART_LABEL_GAP - 4
-export const CHART_LABEL_BOT_Y = CHART_TOTAL_Y + CHART_TOTAL_H - 7 + CHART_LABEL_GAP
+// -5 brings the bottom subtitle visually closer to the digit; the top label
+// already reads correctly so this asymmetry is intentional.
+export const CHART_LABEL_BOT_Y = CHART_TOTAL_Y + CHART_TOTAL_H - 7 + CHART_LABEL_GAP - 5
 
 // Pinned mini-dot size so the headline renders at the same visual size on
 // rain and wind. With cellGap=1 the macro cells are visually separated.

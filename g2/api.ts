@@ -1,5 +1,5 @@
 import type { EvenAppBridge } from '@evenrealities/even_hub_sdk'
-import type { City, UnitSystem, WeatherData, HourlyPoint, DailyPoint } from './state'
+import type { AirQuality, City, UnitSystem, WeatherData, HourlyPoint, DailyPoint } from './state'
 import { getBridge } from './state'
 import { appendEventLog } from '../_shared/log'
 
@@ -198,6 +198,13 @@ export async function fetchWeather(city: City, unit: UnitSystem = 'metric'): Pro
   const sunriseToday = daily.sunrise?.[0] ?? ''
   const sunsetToday = daily.sunset?.[0] ?? ''
 
+  // Air-quality is a separate endpoint that can fail independently; we don't
+  // want a flaky AQ response to kill the whole weather refresh.
+  const airQuality = await fetchAirQuality(city).catch((err) => {
+    appendEventLog(`AQ: fetch failed: ${err instanceof Error ? err.message : String(err)}`)
+    return null
+  })
+
   return applyTestOverrides({
     city: city.name,
     currentTemp: Math.round(current.temperature_2m ?? 0),
@@ -213,7 +220,52 @@ export async function fetchWeather(city: City, unit: UnitSystem = 'metric'): Pro
     sunset: sunsetToday ? formatTime(sunsetToday) : '',
     hourly: hourlyPoints,
     daily: dailyPoints,
+    airQuality,
   })
+}
+
+type OpenMeteoAirQuality = {
+  current?: {
+    european_aqi?: number
+    pm2_5?: number
+    pm10?: number
+    nitrogen_dioxide?: number
+    ozone?: number
+    sulphur_dioxide?: number
+    carbon_monoxide?: number
+  }
+}
+
+async function fetchAirQuality(city: City): Promise<AirQuality | null> {
+  const params = new URLSearchParams({
+    latitude: String(city.latitude),
+    longitude: String(city.longitude),
+    current: 'european_aqi,pm2_5,pm10,nitrogen_dioxide,ozone,sulphur_dioxide,carbon_monoxide',
+    timezone: 'auto',
+  })
+  const res = await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?${params}`)
+  if (!res.ok) throw new Error(`Air-quality fetch failed: ${res.status}`)
+  const data = (await res.json()) as OpenMeteoAirQuality
+  const c = data.current ?? {}
+  return {
+    euAqi: Math.round(c.european_aqi ?? 0),
+    pm2_5: Math.round((c.pm2_5 ?? 0) * 10) / 10,
+    pm10: Math.round((c.pm10 ?? 0) * 10) / 10,
+    nitrogenDioxide: Math.round((c.nitrogen_dioxide ?? 0) * 10) / 10,
+    ozone: Math.round((c.ozone ?? 0) * 10) / 10,
+    sulphurDioxide: Math.round((c.sulphur_dioxide ?? 0) * 10) / 10,
+    carbonMonoxide: Math.round(c.carbon_monoxide ?? 0),
+  }
+}
+
+// EU air-quality index categories (0–100+ scale).
+export function aqiCategory(aqi: number): string {
+  if (aqi < 20) return 'good'
+  if (aqi < 40) return 'fair'
+  if (aqi < 60) return 'moderate'
+  if (aqi < 80) return 'poor'
+  if (aqi < 100) return 'very poor'
+  return 'extremely poor'
 }
 
 // URL query overrides for visual testing of edge cases without touching code.
@@ -261,6 +313,31 @@ function applyTestOverrides(w: WeatherData): WeatherData {
   if (wmo !== undefined) {
     w.currentWmoCode = Math.round(wmo)
     w.currentDescription = wmoDescription(w.currentWmoCode)
+  }
+  // Air quality overrides: aqi sets the headline; pm25/pm10/no2/o3/so2/co
+  // populate individual pollutant bars. Synthesises an airQuality object if
+  // the live fetch failed.
+  const aqi = num('aqi')
+  const pm25 = num('pm25')
+  const pm10 = num('pm10')
+  const no2 = num('no2')
+  const o3 = num('o3')
+  const so2 = num('so2')
+  const co = num('co')
+  if (aqi !== undefined || pm25 !== undefined || pm10 !== undefined || no2 !== undefined ||
+      o3 !== undefined || so2 !== undefined || co !== undefined) {
+    const base: AirQuality = w.airQuality ?? {
+      euAqi: 0, pm2_5: 0, pm10: 0, nitrogenDioxide: 0, ozone: 0, sulphurDioxide: 0, carbonMonoxide: 0,
+    }
+    w.airQuality = {
+      euAqi: aqi !== undefined ? Math.round(aqi) : base.euAqi,
+      pm2_5: pm25 !== undefined ? pm25 : base.pm2_5,
+      pm10: pm10 !== undefined ? pm10 : base.pm10,
+      nitrogenDioxide: no2 !== undefined ? no2 : base.nitrogenDioxide,
+      ozone: o3 !== undefined ? o3 : base.ozone,
+      sulphurDioxide: so2 !== undefined ? so2 : base.sulphurDioxide,
+      carbonMonoxide: co !== undefined ? Math.round(co) : base.carbonMonoxide,
+    }
   }
   return w
 }

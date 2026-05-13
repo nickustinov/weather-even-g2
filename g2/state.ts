@@ -33,6 +33,16 @@ export type DailyPoint = {
   sunshineHours: number
 }
 
+export type AirQuality = {
+  euAqi: number
+  pm2_5: number
+  pm10: number
+  nitrogenDioxide: number
+  ozone: number
+  sulphurDioxide: number
+  carbonMonoxide: number
+}
+
 export type WeatherData = {
   city: string
   currentTemp: number
@@ -48,9 +58,10 @@ export type WeatherData = {
   sunset: string
   hourly: HourlyPoint[]
   daily: DailyPoint[]
+  airQuality: AirQuality | null
 }
 
-export const SCREENS = ['today', 'forecast', 'rain', 'wind', 'hours', 'sun'] as const
+export const SCREENS = ['today', 'forecast', 'rain', 'wind', 'hours', 'sun', 'air'] as const
 export type Screen = (typeof SCREENS)[number]
 
 export type State = {
