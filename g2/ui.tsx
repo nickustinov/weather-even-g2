@@ -1,14 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
-import { Select } from 'even-toolkit/web/select'
+import { SegmentedControl } from 'even-toolkit/web/segmented-control'
+import { SearchBar } from 'even-toolkit/web/search-bar'
 import {
-  searchCities, getSavedUnit, saveUnit, onSettingsLoaded,
+  searchCities, onSettingsLoaded,
   getCities, getActiveCity, cityKey, addCity, removeCity, setActiveCity, setCities, onCitiesChanged,
   getScreenPrefs, saveScreenPrefs, onScreenPrefsChanged,
+  getUnitPrefs, setUnitPrefs, onUnitPrefsChanged,
 } from './api'
 import { refreshWeather } from './app'
 import { SCREEN_LABELS } from './state'
-import type { City, ScreenPref, UnitSystem } from './state'
+import type { City, ScreenPref, UnitPrefs } from './state'
 
 function autoConnect() {
   document.getElementById('connectBtn')?.click()
@@ -252,12 +254,15 @@ function CitiesEditor() {
         </ul>
       )}
 
-      <input
+      <SearchBar
         id="city-search"
-        className="weather-input text-normal-body"
         value={query}
         onChange={handleSearchChange}
         placeholder={cities.length === 0 ? 'Search city...' : 'Add another city...'}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
       />
 
       {filteredResults.length > 0 && (
@@ -278,28 +283,69 @@ function CitiesEditor() {
   )
 }
 
-const UNIT_OPTIONS = [
-  { value: 'metric', label: 'Metric (°C, km/h, mm)' },
-  { value: 'imperial', label: 'Imperial (°F, mph, in)' },
+const TEMP_OPTIONS = [
+  { value: 'C', label: '°C' },
+  { value: 'F', label: '°F' },
+]
+const WIND_OPTIONS = [
+  { value: 'kmh', label: 'km/h' },
+  { value: 'mph', label: 'mph' },
+  { value: 'ms', label: 'm/s' },
+]
+const PRECIP_OPTIONS = [
+  { value: 'mm', label: 'mm' },
+  { value: 'in', label: 'in' },
+]
+const PRESSURE_OPTIONS = [
+  { value: 'hPa', label: 'hPa' },
+  { value: 'inHg', label: 'inHg' },
+  { value: 'mmHg', label: 'mmHg' },
+]
+const TIME_OPTIONS = [
+  { value: '24h', label: '24h' },
+  { value: '12h', label: '12h' },
 ]
 
+function UnitRow({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string
+  options: { value: string; label: string }[]
+  value: string
+  onChange: (v: string) => void
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '8px 0' }}>
+      <span className="text-medium-body" style={{ color: 'var(--color-text)' }}>{label}</span>
+      <SegmentedControl options={options} value={value} onValueChange={onChange} size="small" />
+    </div>
+  )
+}
+
 function UnitPicker() {
-  const [unit, setUnit] = useState<UnitSystem>(getSavedUnit())
+  const [prefs, setPrefs] = useState<UnitPrefs>(() => getUnitPrefs())
 
   useEffect(() => {
-    onSettingsLoaded(() => setUnit(getSavedUnit()))
+    const sync = () => setPrefs(getUnitPrefs())
+    onSettingsLoaded(sync)
+    onUnitPrefsChanged(sync)
   }, [])
 
-  const handleChange = async (value: string) => {
-    const u = value as UnitSystem
-    setUnit(u)
-    await saveUnit(u)
+  const update = async (patch: Partial<UnitPrefs>) => {
+    await setUnitPrefs(patch)
     void refreshWeather()
   }
 
   return (
     <div className="weather-card">
-      <Select value={unit} options={UNIT_OPTIONS} onValueChange={handleChange} />
+      <UnitRow label="Temperature" options={TEMP_OPTIONS} value={prefs.temp} onChange={(v) => void update({ temp: v as UnitPrefs['temp'] })} />
+      <UnitRow label="Wind speed" options={WIND_OPTIONS} value={prefs.wind} onChange={(v) => void update({ wind: v as UnitPrefs['wind'] })} />
+      <UnitRow label="Precipitation" options={PRECIP_OPTIONS} value={prefs.precip} onChange={(v) => void update({ precip: v as UnitPrefs['precip'] })} />
+      <UnitRow label="Pressure" options={PRESSURE_OPTIONS} value={prefs.pressure} onChange={(v) => void update({ pressure: v as UnitPrefs['pressure'] })} />
+      <UnitRow label="Time" options={TIME_OPTIONS} value={prefs.time} onChange={(v) => void update({ time: v as UnitPrefs['time'] })} />
     </div>
   )
 }

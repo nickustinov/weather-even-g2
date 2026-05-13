@@ -1,23 +1,30 @@
 import type { EvenAppBridge } from '@evenrealities/even_hub_sdk'
-import type { AirQuality, City, Pollen, ScreenPref, Screen, UnitSystem, WeatherData, HourlyPoint, DailyPoint } from './state'
-import { DEFAULT_SCREEN_PREFS, SCREENS, getBridge } from './state'
+import type {
+  AirQuality, City, Pollen, ScreenPref, Screen,
+  TempUnit, WindUnit, PrecipUnit, PressureUnit, TimeUnit, UnitPrefs,
+  UnitSystem,
+  WeatherData, HourlyPoint, DailyPoint,
+} from './state'
+import { DEFAULT_SCREEN_PREFS, DEFAULT_UNIT_PREFS, SCREENS, getBridge } from './state'
 import { appendEventLog } from '../_shared/log'
 
 const CITY_KEY = 'weather:city'        // legacy: single-city storage, migrated
 const CITIES_KEY = 'weather:cities'
 const ACTIVE_KEY = 'weather:active-city'
-const UNIT_KEY = 'weather:unit'
+const UNIT_KEY = 'weather:unit'        // legacy: 'metric'|'imperial', migrated
+const UNIT_PREFS_KEY = 'weather:units'
 const SCREENS_KEY = 'weather:screens'
 
 // --- Settings (SDK local storage + memory cache) ---
 
 let cachedCities: City[] = []
 let cachedActiveKey: string = ''
-let cachedUnit: UnitSystem = 'metric'
+let cachedUnitPrefs: UnitPrefs = { ...DEFAULT_UNIT_PREFS }
 let cachedScreenPrefs: ScreenPref[] = DEFAULT_SCREEN_PREFS.slice()
 const settingsListeners: Array<() => void> = []
 const screenPrefsListeners: Array<() => void> = []
 const citiesListeners: Array<() => void> = []
+const unitPrefsListeners: Array<() => void> = []
 
 // Stable identifier for a city — coordinates uniquely identify a place
 // (two cities sharing a name distinguish themselves by lat/lng) and survive
@@ -59,11 +66,20 @@ export async function loadSettings(b: EvenAppBridge): Promise<void> {
     await b.setLocalStorage(ACTIVE_KEY, cachedActiveKey)
   }
 
-  const rawUnit = await b.getLocalStorage(UNIT_KEY)
-  if (rawUnit) {
-    cachedUnit = rawUnit === 'imperial' ? 'imperial' : 'metric'
-  } else if (cachedUnit !== 'metric') {
-    await b.setLocalStorage(UNIT_KEY, cachedUnit)
+  // Per-variable unit prefs (new format). If absent, fall back to the
+  // legacy 'weather:unit' = 'metric'|'imperial' setting and migrate.
+  const rawUnits = await b.getLocalStorage(UNIT_PREFS_KEY)
+  if (rawUnits) {
+    try {
+      const parsed = JSON.parse(rawUnits) as Partial<UnitPrefs>
+      cachedUnitPrefs = { ...DEFAULT_UNIT_PREFS, ...parsed }
+    } catch { /* keep defaults */ }
+  } else {
+    const rawLegacyUnit = await b.getLocalStorage(UNIT_KEY)
+    if (rawLegacyUnit === 'imperial') {
+      cachedUnitPrefs = { temp: 'F', wind: 'mph', precip: 'in', pressure: 'inHg', time: '12h' }
+      await b.setLocalStorage(UNIT_PREFS_KEY, JSON.stringify(cachedUnitPrefs))
+    }
   }
 
   const rawScreens = await b.getLocalStorage(SCREENS_KEY)
@@ -74,10 +90,11 @@ export async function loadSettings(b: EvenAppBridge): Promise<void> {
     } catch { /* ignore parse errors, keep defaults */ }
   }
 
-  appendEventLog(`Settings: cities=${cachedCities.length} active=${cachedActiveKey || 'none'} unit=${cachedUnit}`)
+  appendEventLog(`Settings: cities=${cachedCities.length} active=${cachedActiveKey || 'none'} temp=${cachedUnitPrefs.temp}`)
   for (const cb of settingsListeners) cb()
   for (const cb of screenPrefsListeners) cb()
   for (const cb of citiesListeners) cb()
+  for (const cb of unitPrefsListeners) cb()
 }
 
 // Reconciles persisted prefs with the current SCREENS catalog: keeps any
@@ -184,14 +201,32 @@ export async function saveCity(city: City): Promise<void> {
   await addCity(city)
 }
 
-export function getSavedUnit(): UnitSystem {
-  return cachedUnit
+export function getUnitPrefs(): UnitPrefs {
+  return cachedUnitPrefs
 }
 
-export async function saveUnit(unit: UnitSystem): Promise<void> {
-  cachedUnit = unit
+export function getTempUnit(): TempUnit { return cachedUnitPrefs.temp }
+export function getWindUnit(): WindUnit { return cachedUnitPrefs.wind }
+export function getPrecipUnit(): PrecipUnit { return cachedUnitPrefs.precip }
+export function getPressureUnit(): PressureUnit { return cachedUnitPrefs.pressure }
+export function getTimeUnit(): TimeUnit { return cachedUnitPrefs.time }
+
+export async function setUnitPrefs(patch: Partial<UnitPrefs>): Promise<void> {
+  cachedUnitPrefs = { ...cachedUnitPrefs, ...patch }
   const b = getBridge()
-  if (b) await b.setLocalStorage(UNIT_KEY, unit)
+  if (b) await b.setLocalStorage(UNIT_PREFS_KEY, JSON.stringify(cachedUnitPrefs))
+  for (const cb of unitPrefsListeners) cb()
+}
+
+export function onUnitPrefsChanged(cb: () => void): void {
+  unitPrefsListeners.push(cb)
+}
+
+// Legacy helpers kept so screens that still ask for a single unit system
+// get a reasonable answer (used only by anything not yet migrated to the
+// per-variable API — currently nothing in the codebase).
+export function getSavedUnit(): UnitSystem {
+  return cachedUnitPrefs.temp === 'F' ? 'imperial' : 'metric'
 }
 
 export async function searchCities(query: string): Promise<City[]> {
@@ -235,7 +270,7 @@ function formatTime(isoString: string): string {
   return new Date(isoString).toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false,
+    hour12: cachedUnitPrefs.time === '12h',
   })
 }
 
@@ -278,8 +313,7 @@ type OpenMeteoForecast = {
   }
 }
 
-export async function fetchWeather(city: City, unit: UnitSystem = 'metric'): Promise<WeatherData> {
-  const imperial = unit === 'imperial'
+export async function fetchWeather(city: City, prefs: UnitPrefs = DEFAULT_UNIT_PREFS): Promise<WeatherData> {
   const params = new URLSearchParams({
     latitude: String(city.latitude),
     longitude: String(city.longitude),
@@ -290,9 +324,9 @@ export async function fetchWeather(city: City, unit: UnitSystem = 'metric'): Pro
       'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,wind_speed_10m_max,uv_index_max,sunshine_duration,sunrise,sunset',
     timezone: 'auto',
     forecast_days: '10',
-    temperature_unit: imperial ? 'fahrenheit' : 'celsius',
-    wind_speed_unit: imperial ? 'mph' : 'kmh',
-    precipitation_unit: imperial ? 'inch' : 'mm',
+    temperature_unit: prefs.temp === 'F' ? 'fahrenheit' : 'celsius',
+    wind_speed_unit: prefs.wind, // 'kmh' | 'mph' | 'ms' — matches Open-Meteo's vocab
+    precipitation_unit: prefs.precip === 'in' ? 'inch' : 'mm',
   })
 
   const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`)

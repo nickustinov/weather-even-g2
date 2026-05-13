@@ -12,7 +12,7 @@ import {
   type TextContainerProperty,
 } from '@evenrealities/even_hub_sdk'
 import { appendEventLog } from '../_shared/log'
-import { getSavedUnit } from './api'
+import { getPrecipUnit, getPressureUnit, getWindUnit } from './api'
 import { canvasToBytes } from './icons'
 import { state, getBridge } from './state'
 import { drawWeatherIcon } from './weather-icons'
@@ -109,17 +109,23 @@ export function windLabel(deg: number): string {
 }
 
 export function speedUnit(): string {
-  return getSavedUnit() === 'imperial' ? 'mph' : 'km/h'
+  const u = getWindUnit()
+  if (u === 'mph') return 'mph'
+  if (u === 'ms') return 'm/s'
+  return 'km/h'
 }
 
 export function precipUnit(): string {
-  return getSavedUnit() === 'imperial' ? 'in' : 'mm'
+  return getPrecipUnit()
 }
 
+// Open-Meteo returns surface pressure in hPa; convert to the user's chosen
+// unit for display. Inches of mercury = hPa × 0.02953; millimetres of
+// mercury = hPa × 0.75006.
 export function formatPressure(hPa: number): string {
-  if (getSavedUnit() === 'imperial') {
-    return `${(hPa * 0.02953).toFixed(2)} inHg`
-  }
+  const u = getPressureUnit()
+  if (u === 'inHg') return `${(hPa * 0.02953).toFixed(2)} inHg`
+  if (u === 'mmHg') return `${Math.round(hPa * 0.75006)} mmHg`
   return `${hPa} hPa`
 }
 

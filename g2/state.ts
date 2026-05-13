@@ -1,6 +1,29 @@
 import type { EvenAppBridge } from '@evenrealities/even_hub_sdk'
 
+// Legacy unit system, kept for migration of old saves.
 export type UnitSystem = 'metric' | 'imperial'
+
+export type TempUnit = 'C' | 'F'
+export type WindUnit = 'kmh' | 'mph' | 'ms'
+export type PrecipUnit = 'mm' | 'in'
+export type PressureUnit = 'hPa' | 'inHg' | 'mmHg'
+export type TimeUnit = '24h' | '12h'
+
+export type UnitPrefs = {
+  temp: TempUnit
+  wind: WindUnit
+  precip: PrecipUnit
+  pressure: PressureUnit
+  time: TimeUnit
+}
+
+export const DEFAULT_UNIT_PREFS: UnitPrefs = {
+  temp: 'C',
+  wind: 'kmh',
+  precip: 'mm',
+  pressure: 'hPa',
+  time: '24h',
+}
 
 export type City = {
   name: string

@@ -1,6 +1,6 @@
 import type { EvenAppBridge } from '@evenrealities/even_hub_sdk'
 import { appendEventLog } from '../_shared/log'
-import { fetchWeather, getSavedCity, getSavedUnit, loadSettings } from './api'
+import { fetchWeather, getSavedCity, getUnitPrefs, loadSettings } from './api'
 import { state, setBridge } from './state'
 import { showScreen, showLoading, showSetupMessage, firstScreen } from './renderer'
 import { onEvenHubEvent } from './events'
@@ -14,7 +14,7 @@ export async function refreshWeather(): Promise<void> {
   }
 
   try {
-    state.weather = await fetchWeather(city, getSavedUnit())
+    state.weather = await fetchWeather(city, getUnitPrefs())
     appendEventLog(`Weather: refreshed for ${city.name}`)
   } catch (err) {
     console.error('[weather] refreshWeather failed', err)
