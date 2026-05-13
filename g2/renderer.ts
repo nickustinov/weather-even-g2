@@ -11,6 +11,7 @@ import { state, getBridge, SCREENS } from './state'
 import type { WeatherData } from './state'
 import { getSavedUnit } from './api'
 import { drawWeatherIconAt, canvasToBytes } from './icons'
+import { autoSizeDotted, drawDotted, measureDotted } from './dot-digits'
 import umbrellaUrl from './assets/umbrella.png'
 import windIconUrl from './assets/wind.png'
 
@@ -78,6 +79,187 @@ async function sendImage(bytes: number[], containerID: number, containerName: st
     new ImageRawDataUpdate({ containerID, containerName, imageData: bytes }),
   )
   appendEventLog(`Image: ${String(result)}`)
+}
+
+// ---------------------------------------------------------------------------
+// Today screen – at-a-glance day summary
+//
+// Layout:
+//   ┌─ header: "city · day DD mon" ──────────────────────────────────────┐
+//   │                                  │                                  │
+//   │     BIG DOTTED HIGH TEMP         │   rise   06:45                   │
+//   │           (canvas image)         │   set    19:30                   │
+//   │                                  │                                  │
+//   │                                  │   ━━━━━━━━━━────── 62%           │
+//   │                                  │                                  │
+//   │     ↑ 22°   ↓ 10°                │   uv     6                       │
+//   │                                  │   sun    8.2 h                   │
+//   │                                  │   rain   0.5 mm                  │
+//   └────────────────────────────────────────────────────────────────────┘
+// ---------------------------------------------------------------------------
+
+// Sized so every text container is taller than the firmware font's natural
+// ~30px line height — when the container is shorter than what the font wants,
+// LVGL renders a small vertical scrollbar sliver on the right edge.
+const TODAY_PAD = 8
+const TODAY_HEADER_Y = 0
+const TODAY_HEADER_H = 38
+const TODAY_BODY_Y = TODAY_HEADER_H + 4
+
+// Left half: big dotted temp + range subtitle, vertically centred as a unit.
+const TODAY_TEMP_W = Math.floor(DISPLAY_WIDTH / 2) - TODAY_PAD * 2
+const TODAY_TEMP_H = 130
+const TODAY_RANGE_H = 38
+const TODAY_LEFT_TOTAL_H = TODAY_TEMP_H + 6 + TODAY_RANGE_H
+const TODAY_TEMP_X = TODAY_PAD
+const TODAY_TEMP_Y = Math.floor((DISPLAY_HEIGHT - TODAY_LEFT_TOTAL_H) / 2)
+const TODAY_RANGE_Y = TODAY_TEMP_Y + TODAY_TEMP_H + 6
+
+// Right half: stats grid (two text columns + a progress-bar row).
+const TODAY_RIGHT_X = Math.floor(DISPLAY_WIDTH / 2) + TODAY_PAD
+const TODAY_RIGHT_W = DISPLAY_WIDTH - TODAY_RIGHT_X - TODAY_PAD
+const TODAY_STAT_LABEL_W = 90
+const TODAY_STAT_VALUE_X = TODAY_RIGHT_X + TODAY_STAT_LABEL_W
+const TODAY_STAT_VALUE_W = TODAY_RIGHT_W - TODAY_STAT_LABEL_W
+
+const DAYS_SHORT = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+const MONTHS_SHORT = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+
+function todayHeader(city: string): string {
+  const d = new Date()
+  return `${city.toLowerCase()}  ·  ${DAYS_SHORT[d.getDay()]} ${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`
+}
+
+function todayRange(today: WeatherData['daily'][number]): string {
+  return `↑ ${today.tempMax}°    ↓ ${today.tempMin}°`
+}
+
+function timeToMinutes(hhmm: string): number {
+  const parts = hhmm.split(':')
+  if (parts.length !== 2) return 0
+  return Number(parts[0]) * 60 + Number(parts[1])
+}
+
+function formatHm(mins: number): string {
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  if (h === 0) return `${m}m`
+  return `${h}h ${m}m`
+}
+
+function daylightValue(sunrise: string, sunset: string): string {
+  const now = new Date()
+  const nowMin = now.getHours() * 60 + now.getMinutes()
+  const sunMin = timeToMinutes(sunrise)
+  const setMin = timeToMinutes(sunset)
+  if (nowMin < sunMin) return formatHm(setMin - sunMin)
+  if (nowMin >= setMin) return '0m'
+  return formatHm(setMin - nowMin)
+}
+
+function todayStatLabels(): string {
+  return ['rise', 'set', '', 'uv', 'sun', 'rain', 'daylight'].join('\n')
+}
+
+function todayStatValues(w: WeatherData, today: WeatherData['daily'][number]): string {
+  return [
+    w.sunrise,
+    w.sunset,
+    '',
+    String(Math.round(today.uvMax)),
+    `${today.sunshineHours.toFixed(1)} h`,
+    `${today.precipSum.toFixed(1)} ${precipUnit()}`,
+    daylightValue(w.sunrise, w.sunset),
+  ].join('\n')
+}
+
+function renderDottedNumberBytes(text: string, w: number, h: number): number[] {
+  const opts = autoSizeDotted(text, w - 12, h - 8, 10, 5)
+  const m = measureDotted(text, opts)
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = '#000'
+  ctx.fillRect(0, 0, w, h)
+  ctx.fillStyle = '#fff'
+  const x = Math.floor((w - m.width) / 2)
+  const y = Math.floor((h - m.height) / 2)
+  drawDotted(ctx, text, x, y, opts)
+  return canvasToBytes(canvas)
+}
+
+async function showTodayScreen(w: WeatherData): Promise<void> {
+  const today = w.daily[0]
+  if (!today) {
+    await showLoading()
+    return
+  }
+
+  const headlineText = `${today.tempMax}°`
+
+  await rebuildPage({
+    containerTotalNum: 5,
+    textObject: [
+      new TextContainerProperty({
+        containerID: 1,
+        containerName: 'header',
+        content: todayHeader(w.city),
+        xPosition: TODAY_PAD,
+        yPosition: TODAY_HEADER_Y + 2,
+        width: DISPLAY_WIDTH - TODAY_PAD * 2,
+        height: TODAY_HEADER_H,
+        isEventCapture: 1,
+        paddingLength: 4,
+      }),
+      new TextContainerProperty({
+        containerID: 2,
+        containerName: 'range',
+        content: todayRange(today),
+        xPosition: TODAY_TEMP_X,
+        yPosition: TODAY_RANGE_Y,
+        width: TODAY_TEMP_W,
+        height: TODAY_RANGE_H,
+        isEventCapture: 0,
+        paddingLength: 4,
+      }),
+      new TextContainerProperty({
+        containerID: 3,
+        containerName: 'statlabels',
+        content: todayStatLabels(),
+        xPosition: TODAY_RIGHT_X,
+        yPosition: TODAY_BODY_Y,
+        width: TODAY_STAT_LABEL_W,
+        height: DISPLAY_HEIGHT - TODAY_BODY_Y - TODAY_PAD,
+        isEventCapture: 0,
+        paddingLength: 4,
+      }),
+      new TextContainerProperty({
+        containerID: 4,
+        containerName: 'statvalues',
+        content: todayStatValues(w, today),
+        xPosition: TODAY_STAT_VALUE_X,
+        yPosition: TODAY_BODY_Y,
+        width: TODAY_STAT_VALUE_W,
+        height: DISPLAY_HEIGHT - TODAY_BODY_Y - TODAY_PAD,
+        isEventCapture: 0,
+        paddingLength: 4,
+      }),
+    ],
+    imageObject: [
+      new ImageContainerProperty({
+        containerID: 5,
+        containerName: 'headline',
+        xPosition: TODAY_TEMP_X,
+        yPosition: TODAY_TEMP_Y,
+        width: TODAY_TEMP_W,
+        height: TODAY_TEMP_H,
+      }),
+    ],
+  })
+
+  await sendImage(renderDottedNumberBytes(headlineText, TODAY_TEMP_W, TODAY_TEMP_H), 5, 'headline')
+  appendEventLog(`Screen: ${state.screen}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -511,6 +693,9 @@ export async function showScreen(): Promise<void> {
   }
 
   switch (state.screen) {
+    case 'today':
+      await showTodayScreen(state.weather)
+      break
     case 'forecast':
       await showForecastScreen(state.weather)
       break
