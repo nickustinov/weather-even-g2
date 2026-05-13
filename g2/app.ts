@@ -4,6 +4,7 @@ import { fetchWeather, getSavedCity, getSavedUnit, loadSettings } from './api'
 import { state, setBridge } from './state'
 import { showScreen, showLoading, showSetupMessage, firstScreen } from './renderer'
 import { onEvenHubEvent } from './events'
+import { preloadWeatherIcons } from './weather-icons'
 
 export async function refreshWeather(): Promise<void> {
   const city = getSavedCity()
@@ -64,7 +65,7 @@ export async function initApp(appBridge: EvenAppBridge): Promise<void> {
     onEvenHubEvent(event)
   })
 
-  await loadSettings(appBridge)
+  await Promise.all([loadSettings(appBridge), preloadWeatherIcons()])
 
   if (getSavedCity()) {
     appendEventLog('Weather: city found, loading forecast')
