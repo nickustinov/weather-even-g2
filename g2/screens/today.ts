@@ -47,7 +47,7 @@ const TODAY_STAT_LABEL_W = 90
 const TODAY_STAT_VALUE_X = TODAY_RIGHT_X + TODAY_STAT_LABEL_W
 const TODAY_STAT_VALUE_W = TODAY_RIGHT_W - TODAY_STAT_LABEL_W
 
-const TODAY_CONDITION_ICON_SIZE = 48
+const TODAY_CONDITION_ICON_SIZE = 58
 
 // Today's headline is slightly larger than the chart screens but still fixed
 // so swiping between values doesn't rescale. d=3 macro cell = 11px, '100°'
@@ -69,8 +69,8 @@ function todayDegreePosition(temp: number): { x: number; y: number } {
   // centered. Icon sits below the visible glyph bounds.
   const yOffset = Math.floor((TODAY_TEMP_H - measured.height) / 2)
   return {
-    x: TODAY_TEMP_X + 4 + prefixWidth + charGap - 6,
-    y: TODAY_TEMP_Y + yOffset + measured.height - 28,
+    x: TODAY_TEMP_X + 4 + prefixWidth + charGap + 14,
+    y: TODAY_TEMP_Y + yOffset + measured.height - 23,
   }
 }
 

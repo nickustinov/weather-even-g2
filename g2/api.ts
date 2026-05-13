@@ -254,5 +254,13 @@ function applyTestOverrides(w: WeatherData): WeatherData {
   if (todayHi !== undefined && w.daily[0]) w.daily[0].tempMax = Math.round(todayHi)
   const todayLo = num('today_lo')
   if (todayLo !== undefined && w.daily[0]) w.daily[0].tempMin = Math.round(todayLo)
+  // wmo overrides the current WMO weather code so we can preview each
+  // condition icon (0=clear, 2=partly cloudy, 3=overcast, 45=fog, 61=rain,
+  // 71=snow, 95=thunderstorm, etc.). Description updates to match.
+  const wmo = num('wmo')
+  if (wmo !== undefined) {
+    w.currentWmoCode = Math.round(wmo)
+    w.currentDescription = wmoDescription(w.currentWmoCode)
+  }
   return w
 }
