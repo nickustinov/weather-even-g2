@@ -40,6 +40,7 @@ export type WeatherData = {
   currentDescription: string
   feelsLike: number
   windSpeed: number
+  windGust: number
   windDirection: number
   humidity: number
   pressure: number

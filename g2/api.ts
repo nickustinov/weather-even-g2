@@ -109,6 +109,7 @@ type OpenMeteoForecast = {
     weather_code?: number
     wind_speed_10m?: number
     wind_direction_10m?: number
+    wind_gusts_10m?: number
     surface_pressure?: number
   }
   hourly?: {
@@ -142,7 +143,7 @@ export async function fetchWeather(city: City, unit: UnitSystem = 'metric'): Pro
     latitude: String(city.latitude),
     longitude: String(city.longitude),
     current:
-      'temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,surface_pressure',
+      'temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,surface_pressure',
     hourly: 'temperature_2m,weather_code,precipitation_probability,precipitation,wind_speed_10m,wind_direction_10m,wind_gusts_10m',
     daily:
       'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,wind_speed_10m_max,uv_index_max,sunshine_duration,sunrise,sunset',
@@ -204,6 +205,7 @@ export async function fetchWeather(city: City, unit: UnitSystem = 'metric'): Pro
     currentDescription: wmoDescription(current.weather_code ?? 0),
     feelsLike: Math.round(current.apparent_temperature ?? 0),
     windSpeed: Math.round(current.wind_speed_10m ?? 0),
+    windGust: Math.round(current.wind_gusts_10m ?? 0),
     windDirection: Math.round(current.wind_direction_10m ?? 0),
     humidity: Math.round(current.relative_humidity_2m ?? 0),
     pressure: Math.round(current.surface_pressure ?? 0),
@@ -232,6 +234,8 @@ function applyTestOverrides(w: WeatherData): WeatherData {
   if (feels !== undefined) w.feelsLike = Math.round(feels)
   const wind = num('wind')
   if (wind !== undefined) w.windSpeed = Math.round(wind)
+  const gust = num('gust')
+  if (gust !== undefined) w.windGust = Math.round(gust)
   const windDir = num('winddir')
   if (windDir !== undefined) w.windDirection = Math.round(windDir)
   const humidity = num('humidity')
