@@ -1,9 +1,37 @@
+@import "tailwindcss";
 @import "even-toolkit/web/theme-light.css";
 @import "even-toolkit/web/typography.css";
 @import "even-toolkit/web/utilities.css";
 
+@source "../node_modules/even-toolkit";
+
+/* Register Even theme tokens as Tailwind theme colours so toolkit
+   classes like bg-surface, text-text-dim, border-border resolve. */
+@theme {
+  --color-text: #232323;
+  --color-text-dim: #7B7B7B;
+  --color-text-muted: #7B7B7B;
+  --color-text-highlight: #FFFFFF;
+  --color-bg: #EEEEEE;
+  --color-surface: #FFFFFF;
+  --color-surface-light: #F6F6F6;
+  --color-surface-lighter: #E4E4E4;
+  --color-border: #E4E4E4;
+  --color-accent: #232323;
+  --color-accent-alpha: rgba(35,35,35,0.08);
+  --color-input-bg: rgba(35,35,35,0.08);
+  --color-positive: #4BB956;
+  --color-negative: #FF453A;
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
 }
 
 body {
@@ -19,4 +47,62 @@ body {
 a {
   color: inherit;
   text-decoration: underline;
+}
+
+.weather-input {
+  height: 40px;
+  width: 100%;
+  background: var(--color-input-bg);
+  color: var(--color-text);
+  border: none;
+  border-radius: var(--radius-default);
+  padding: 0 16px;
+  font-family: var(--font-body);
+  outline: none;
+}
+
+.weather-btn {
+  height: 40px;
+  padding: 0 20px;
+  border: none;
+  border-radius: var(--radius-default);
+  background: var(--color-accent);
+  color: var(--color-text-highlight);
+  cursor: pointer;
+  font-family: var(--font-body);
+  white-space: nowrap;
+}
+
+.weather-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.weather-btn--ghost {
+  background: var(--color-input-bg);
+  color: var(--color-text);
+}
+
+.weather-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-default);
+  padding: var(--spacing-card-margin);
+  margin-bottom: var(--spacing-cross);
+}
+
+.weather-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.weather-row:last-child {
+  border-bottom: none;
+}
+
+.weather-row__main {
+  flex: 1;
+  min-width: 0;
 }

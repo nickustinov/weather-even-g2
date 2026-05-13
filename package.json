@@ -12,10 +12,15 @@
     "@evenrealities/even_hub_sdk": "^0.0.10",
     "@evenrealities/pretext": "^0.1.4",
     "@phosphor-icons/core": "^2.1.1",
-    "even-toolkit": "^1.0.1",
+    "@tailwindcss/vite": "^4.3.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "even-toolkit": "^1.7.2",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "suncalc": "^1.9.0"
+    "suncalc": "^1.9.0",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss": "^4.3.0"
   },
   "devDependencies": {
     "@evenrealities/evenhub-cli": "^0.1.9",

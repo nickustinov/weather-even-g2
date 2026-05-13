@@ -1,59 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
+import { Select } from 'even-toolkit/web/select'
 import { searchCities, getSavedCity, saveCity, getSavedUnit, saveUnit, onSettingsLoaded } from './api'
 import { refreshWeather } from './app'
 import type { City, UnitSystem } from './state'
-
-/* ── shared styles ─────────────────────────────────────── */
-
-const cardStyle: React.CSSProperties = {
-  background: 'var(--color-surface)',
-  borderRadius: 'var(--radius-default)',
-  padding: 'var(--spacing-card-margin)',
-}
-
-const inputStyle: React.CSSProperties = {
-  height: 36,
-  width: '100%',
-  background: 'var(--color-input-bg)',
-  color: 'var(--color-text)',
-  border: 'none',
-  borderRadius: 'var(--radius-default)',
-  padding: '0 16px',
-  fontFamily: 'var(--font-body)',
-  outline: 'none',
-}
-
-const resultBtnStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  width: '100%',
-  height: 40,
-  border: '1px solid var(--color-border)',
-  borderRadius: 'var(--radius-default)',
-  background: 'transparent',
-  color: 'var(--color-text)',
-  fontFamily: 'var(--font-body)',
-  padding: '0 16px',
-  cursor: 'pointer',
-  textAlign: 'left' as const,
-}
-
-const actionBtnStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  width: '100%',
-  height: 48,
-  border: 'none',
-  borderRadius: 'var(--radius-default)',
-  background: 'var(--color-surface)',
-  color: 'var(--color-text)',
-  fontFamily: 'var(--font-body)',
-  cursor: 'pointer',
-}
-
-/* ── helpers ────────────────────────────────────────────── */
 
 function autoConnect() {
   document.getElementById('connectBtn')?.click()
@@ -65,8 +15,6 @@ function cityLabel(city: City): string {
   parts.push(city.country)
   return parts.join(', ')
 }
-
-/* ── components ─────────────────────────────────────────── */
 
 function CitySearch() {
   const [query, setQuery] = useState('')
@@ -102,7 +50,7 @@ function CitySearch() {
   }
 
   return (
-    <div style={cardStyle}>
+    <div className="weather-card">
       {current && (
         <p className="text-subtitle" style={{ color: 'var(--color-text-dim)', margin: 0 }}>
           Current: {cityLabel(current)}
@@ -110,8 +58,8 @@ function CitySearch() {
       )}
       <input
         id="city-search"
-        className="text-medium-body"
-        style={{ ...inputStyle, marginTop: current ? 'var(--spacing-cross)' : 0 }}
+        className="weather-input text-normal-body"
+        style={{ marginTop: current ? 'var(--spacing-cross)' : 0 }}
         value={query}
         onChange={handleChange}
         placeholder="Search city..."
@@ -119,7 +67,12 @@ function CitySearch() {
       {results.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-same)', marginTop: 'var(--spacing-cross)' }}>
           {results.map((city, i) => (
-            <button key={i} className="text-normal-body" style={resultBtnStyle} onClick={() => handleSelect(city)}>
+            <button
+              key={i}
+              className="weather-btn weather-btn--ghost text-normal-body"
+              style={{ justifyContent: 'flex-start', textAlign: 'left' }}
+              onClick={() => handleSelect(city)}
+            >
               {cityLabel(city)}
             </button>
           ))}
@@ -129,22 +82,10 @@ function CitySearch() {
   )
 }
 
-const toggleStyle: React.CSSProperties = {
-  display: 'inline-flex',
-  borderRadius: 'var(--radius-default)',
-  overflow: 'hidden',
-  border: '1px solid var(--color-border, #333)',
-}
-
-const toggleBtnStyle = (active: boolean): React.CSSProperties => ({
-  padding: '6px 16px',
-  border: 'none',
-  cursor: 'pointer',
-  fontFamily: 'var(--font-body)',
-  fontSize: 14,
-  background: active ? 'var(--color-accent, #007AFF)' : 'var(--color-input-bg, #2a2a2a)',
-  color: active ? 'var(--color-text-highlight, #fff)' : 'var(--color-text-dim, #888)',
-})
+const UNIT_OPTIONS = [
+  { value: 'metric', label: 'Metric (°C, km/h, mm)' },
+  { value: 'imperial', label: 'Imperial (°F, mph, in)' },
+]
 
 function UnitPicker() {
   const [unit, setUnit] = useState<UnitSystem>(getSavedUnit())
@@ -153,18 +94,16 @@ function UnitPicker() {
     onSettingsLoaded(() => setUnit(getSavedUnit()))
   }, [])
 
-  const handleChange = async (value: UnitSystem) => {
-    setUnit(value)
-    await saveUnit(value)
+  const handleChange = async (value: string) => {
+    const u = value as UnitSystem
+    setUnit(u)
+    await saveUnit(u)
     void refreshWeather()
   }
 
   return (
-    <div style={cardStyle}>
-      <div style={toggleStyle}>
-        <button style={toggleBtnStyle(unit === 'metric')} onClick={() => handleChange('metric')}>Metric</button>
-        <button style={toggleBtnStyle(unit === 'imperial')} onClick={() => handleChange('imperial')}>Imperial</button>
-      </div>
+    <div className="weather-card">
+      <Select value={unit} options={UNIT_OPTIONS} onValueChange={handleChange} />
     </div>
   )
 }
@@ -172,15 +111,15 @@ function UnitPicker() {
 function SettingsPanel() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      <h2 className="text-large-title" style={{ margin: `0 0 var(--spacing-cross)` }}>City</h2>
+      <h2 className="text-large-title" style={{ margin: '0 0 var(--spacing-cross)' }}>City</h2>
       <CitySearch />
 
-      <h2 className="text-large-title" style={{ margin: `var(--spacing-cross) 0` }}>Units</h2>
+      <h2 className="text-large-title" style={{ margin: 'var(--spacing-cross) 0' }}>Units</h2>
       <UnitPicker />
 
       <button
-        className="text-medium-title"
-        style={{ ...actionBtnStyle, marginTop: 'var(--spacing-section)' }}
+        className="weather-btn text-medium-title"
+        style={{ width: '100%', marginTop: 'var(--spacing-section)' }}
         onClick={() => void refreshWeather()}
       >
         Refresh forecast
@@ -193,19 +132,14 @@ export function initUI(): void {
   const app = document.getElementById('app')
   if (!app) return
 
-  for (const id of ['actionBtn']) {
-    const el = document.getElementById(id)
-    if (el) el.remove()
-  }
-
   const connectBtn = document.getElementById('connectBtn')
   if (connectBtn) connectBtn.style.display = 'none'
 
-  const heading = app.querySelector('h1')
-  if (heading) heading.remove()
-
   const status = document.getElementById('status')
   if (status) status.remove()
+
+  const actionBtn = document.getElementById('actionBtn')
+  if (actionBtn) actionBtn.remove()
 
   const container = document.createElement('div')
   app.appendChild(container)
