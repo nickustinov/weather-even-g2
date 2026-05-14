@@ -29,6 +29,7 @@ import {
   CHART_TOTAL_Y,
   CHART_VALUES_W,
   CHART_VALUES_X,
+  displayTime,
   rebuildPage,
   renderDottedNumberBytes,
   sendImage,
@@ -38,7 +39,7 @@ import {
 const UV_BAR_MAX = 11
 
 function uvTimesText(w: WeatherData): string {
-  return w.hourly.slice(0, CHART_HOURS_VISIBLE).map(h => h.time).join('\n')
+  return w.hourly.slice(0, CHART_HOURS_VISIBLE).map(h => displayTime(h.time, true)).join('\n')
 }
 
 function uvBarsText(w: WeatherData): string {
@@ -71,8 +72,8 @@ function protectionWindow(w: WeatherData): string {
   }
   const protectHours = todayWindow.filter(h => h.uvIndex >= 3)
   if (protectHours.length === 0) return uvCategory(w.hourly[0]?.uvIndex ?? 0)
-  const first = protectHours[0].time
-  const last = protectHours[protectHours.length - 1].time
+  const first = displayTime(protectHours[0].time)
+  const last = displayTime(protectHours[protectHours.length - 1].time)
   if (first === last) return `protect at ${first}`
   return `protect ${first}–${last}`
 }

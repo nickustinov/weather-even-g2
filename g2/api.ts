@@ -266,11 +266,14 @@ function wmoDescription(code: number): string {
 
 const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 
+// Always returns 24h "HH:MM"; display-time formatting lives in
+// render-shared.ts (displayTime/displayTimeCompact) so internal helpers
+// like timeToMinutes can keep parsing a stable canonical shape.
 function formatTime(isoString: string): string {
   return new Date(isoString).toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
-    hour12: cachedUnitPrefs.time === '12h',
+    hour12: false,
   })
 }
 
@@ -297,6 +300,7 @@ type OpenMeteoForecast = {
     relative_humidity_2m?: number[]
     dew_point_2m?: number[]
     uv_index?: number[]
+    surface_pressure?: number[]
   }
   daily?: {
     time?: string[]
@@ -319,7 +323,7 @@ export async function fetchWeather(city: City, prefs: UnitPrefs = DEFAULT_UNIT_P
     longitude: String(city.longitude),
     current:
       'temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,surface_pressure',
-    hourly: 'temperature_2m,weather_code,precipitation_probability,precipitation,wind_speed_10m,wind_direction_10m,wind_gusts_10m,relative_humidity_2m,dew_point_2m,uv_index',
+    hourly: 'temperature_2m,weather_code,precipitation_probability,precipitation,wind_speed_10m,wind_direction_10m,wind_gusts_10m,relative_humidity_2m,dew_point_2m,uv_index,surface_pressure',
     daily:
       'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,wind_speed_10m_max,uv_index_max,sunshine_duration,sunrise,sunset',
     timezone: 'auto',
@@ -358,6 +362,7 @@ export async function fetchWeather(city: City, prefs: UnitPrefs = DEFAULT_UNIT_P
         humidity: Math.round(hourly.relative_humidity_2m?.[idx] ?? 0),
         dewPoint: Math.round(hourly.dew_point_2m?.[idx] ?? 0),
         uvIndex: Math.round((hourly.uv_index?.[idx] ?? 0) * 10) / 10,
+        pressure: Math.round(hourly.surface_pressure?.[idx] ?? 0),
       }
     })
 

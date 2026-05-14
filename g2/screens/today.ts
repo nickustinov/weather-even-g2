@@ -8,6 +8,7 @@ import { state } from '../state'
 import type { WeatherData } from '../state'
 import {
   daylightRemaining,
+  displayTime,
   formatPressure,
   rebuildPage,
   renderDottedNumberBytes,
@@ -93,8 +94,8 @@ function todayStatValues(w: WeatherData, today: WeatherData['daily'][number]): s
     `${w.windSpeed} ${speedUnit()} ${windLabel(w.windDirection)}`,
     `${w.humidity}%`,
     formatPressure(w.pressure),
-    w.sunrise,
-    w.sunset,
+    displayTime(w.sunrise),
+    displayTime(w.sunset),
     String(Math.round(today.uvMax)),
   ].join('\n')
 }

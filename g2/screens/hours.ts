@@ -8,7 +8,7 @@ import { canvasToBytes } from '../icons'
 import { state } from '../state'
 import type { HourlyPoint, WeatherData } from '../state'
 import { drawWeatherIcon } from '../weather-icons'
-import { rebuildPage, sendImage, todayDateString } from '../render-shared'
+import { displayTime, rebuildPage, sendImage, todayDateString } from '../render-shared'
 
 // Vertical 2-column hourly forecast. Each column shows 8 hours with one
 // text container per data type (times / temps / percents) and 2 image
@@ -48,7 +48,7 @@ const HOURS_PCT_X = HOURS_TEMP_X + HOURS_TEMP_W + HOURS_GAP
 const RIGHT_HALF_OFFSET = Math.floor(DISPLAY_WIDTH / 2)
 
 function timesText(hours: HourlyPoint[]): string {
-  return hours.map(h => h.time).join('\n')
+  return hours.map(h => displayTime(h.time, true)).join('\n')
 }
 
 function tempsText(hours: HourlyPoint[]): string {

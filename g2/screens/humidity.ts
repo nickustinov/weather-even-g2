@@ -29,6 +29,7 @@ import {
   CHART_TOTAL_Y,
   CHART_VALUES_W,
   CHART_VALUES_X,
+  displayTime,
   rebuildPage,
   renderDottedNumberBytes,
   sendImage,
@@ -36,7 +37,7 @@ import {
 } from '../render-shared'
 
 function humidityTimesText(w: WeatherData): string {
-  return w.hourly.slice(0, CHART_HOURS_VISIBLE).map(h => h.time).join('\n')
+  return w.hourly.slice(0, CHART_HOURS_VISIBLE).map(h => displayTime(h.time, true)).join('\n')
 }
 
 function humidityBarsText(w: WeatherData): string {

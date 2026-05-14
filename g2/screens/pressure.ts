@@ -5,7 +5,7 @@ import {
 import { appendEventLog } from '../../_shared/log'
 import { DISPLAY_WIDTH } from '../layout'
 import { state } from '../state'
-import type { WeatherData } from '../state'
+import type { HourlyPoint, WeatherData } from '../state'
 import {
   CHART_BAR_CHARS,
   CHART_BARS_W,
@@ -13,7 +13,6 @@ import {
   CHART_BODY_H,
   CHART_BODY_Y,
   CHART_HEADER_H,
-  CHART_HEADLINE_OPTS,
   CHART_HOURS_VISIBLE,
   CHART_LABEL_BOT_H,
   CHART_LABEL_BOT_Y,
@@ -29,41 +28,53 @@ import {
   CHART_VALUES_W,
   CHART_VALUES_X,
   displayTime,
-  precipUnit,
+  formatPressureValue,
+  pressureUnitLabel,
   rebuildPage,
   renderDottedNumberBytes,
   sendImage,
   todayDateString,
 } from '../render-shared'
 
-function rainTimesText(w: WeatherData): string {
+// Pressure scale: clamp the bars to a fixed 980–1040 hPa window (the typical
+// dynamic range) and only widen if the actual hourly readings drift beyond
+// it. Stops a calm "999, 1000, 1001" sequence from drawing dramatic bars.
+const PRESSURE_FLOOR = 980
+const PRESSURE_CEIL = 1040
+
+function trendLabel(w: WeatherData): string {
+  const hours = w.hourly.slice(0, CHART_HOURS_VISIBLE)
+  if (hours.length < 2) return 'steady'
+  const delta = hours[hours.length - 1].pressure - hours[0].pressure
+  if (delta >= 2) return 'rising'
+  if (delta <= -2) return 'falling'
+  return 'steady'
+}
+
+function pressureTimesText(w: WeatherData): string {
   return w.hourly.slice(0, CHART_HOURS_VISIBLE).map(h => displayTime(h.time, true)).join('\n')
 }
 
-function rainBarsText(w: WeatherData): string {
-  return w.hourly.slice(0, CHART_HOURS_VISIBLE).map(h => {
-    const filled = Math.max(0, Math.min(CHART_BAR_CHARS, Math.round((h.precipProb / 100) * CHART_BAR_CHARS)))
+function pressureBarsText(w: WeatherData): string {
+  const hours = w.hourly.slice(0, CHART_HOURS_VISIBLE)
+  const lo = Math.min(PRESSURE_FLOOR, ...hours.map(h => h.pressure))
+  const hi = Math.max(PRESSURE_CEIL, ...hours.map(h => h.pressure))
+  const span = Math.max(hi - lo, 1)
+  return hours.map(h => {
+    const ratio = (h.pressure - lo) / span
+    const filled = Math.max(0, Math.min(CHART_BAR_CHARS, Math.round(ratio * CHART_BAR_CHARS)))
     return '━'.repeat(filled) + '─'.repeat(CHART_BAR_CHARS - filled)
   }).join('\n')
 }
 
-function rainPercentsText(w: WeatherData): string {
-  return w.hourly.slice(0, CHART_HOURS_VISIBLE).map(h => `${h.precipProb}%`).join('\n')
+function pressureValuesText(w: WeatherData): string {
+  return w.hourly.slice(0, CHART_HOURS_VISIBLE)
+    .map((h: HourlyPoint) => formatPressureValue(h.pressure))
+    .join('\n')
 }
 
-function rainPeakLine(w: WeatherData): string {
-  const next = w.hourly.slice(0, 12)
-  if (next.length === 0) return ''
-  const peak = next.reduce((best, h) => h.precipProb > best.precipProb ? h : best, next[0])
-  if (peak.precipProb === 0) return 'no rain expected'
-  return `peak ${peak.precipProb}% at ${displayTime(peak.time)}`
-}
-
-export async function showRainScreen(w: WeatherData): Promise<void> {
-  const totalRaw = w.daily[0]?.precipSum ?? 0
-  // 1 decimal under 10 ("0.5"), integer at 10+ ("12", "999"). Always ≤ 3
-  // chars so the fixed CHART_HEADLINE_OPTS dotSize never overflows.
-  const totalStr = totalRaw < 10 ? totalRaw.toFixed(1) : Math.round(totalRaw).toString()
+export async function showPressureScreen(w: WeatherData): Promise<void> {
+  const currentStr = formatPressureValue(w.pressure)
 
   await rebuildPage({
     containerTotalNum: 7,
@@ -71,7 +82,7 @@ export async function showRainScreen(w: WeatherData): Promise<void> {
       new TextContainerProperty({
         containerID: 1,
         containerName: 'header',
-        content: `${w.city.toLowerCase()}  ·  ${w.currentTemp}°  ·  ${todayDateString()}  ·  ${rainPeakLine(w)}`,
+        content: `${w.city.toLowerCase()}  ·  ${w.currentTemp}°  ·  ${todayDateString()}  ·  ${trendLabel(w)}`,
         xPosition: CHART_PAD,
         yPosition: 2,
         width: DISPLAY_WIDTH - CHART_PAD * 2,
@@ -82,7 +93,7 @@ export async function showRainScreen(w: WeatherData): Promise<void> {
       new TextContainerProperty({
         containerID: 2,
         containerName: 'times',
-        content: rainTimesText(w),
+        content: pressureTimesText(w),
         xPosition: CHART_TIMES_X,
         yPosition: CHART_BODY_Y,
         width: CHART_TIMES_W,
@@ -93,7 +104,7 @@ export async function showRainScreen(w: WeatherData): Promise<void> {
       new TextContainerProperty({
         containerID: 3,
         containerName: 'bars',
-        content: rainBarsText(w),
+        content: pressureBarsText(w),
         xPosition: CHART_BARS_X,
         yPosition: CHART_BODY_Y,
         width: CHART_BARS_W,
@@ -103,8 +114,8 @@ export async function showRainScreen(w: WeatherData): Promise<void> {
       }),
       new TextContainerProperty({
         containerID: 4,
-        containerName: 'percents',
-        content: rainPercentsText(w),
+        containerName: 'values',
+        content: pressureValuesText(w),
         xPosition: CHART_VALUES_X,
         yPosition: CHART_BODY_Y,
         width: CHART_VALUES_W,
@@ -114,8 +125,8 @@ export async function showRainScreen(w: WeatherData): Promise<void> {
       }),
       new TextContainerProperty({
         containerID: 5,
-        containerName: 'preciplabel',
-        content: 'precipitation',
+        containerName: 'preslabel',
+        content: 'pressure',
         xPosition: CHART_TOTAL_X,
         yPosition: CHART_LABEL_TOP_Y,
         width: CHART_TOTAL_W,
@@ -125,8 +136,8 @@ export async function showRainScreen(w: WeatherData): Promise<void> {
       }),
       new TextContainerProperty({
         containerID: 6,
-        containerName: 'unit',
-        content: `${precipUnit()} today`,
+        containerName: 'pressub',
+        content: pressureUnitLabel(),
         xPosition: CHART_TOTAL_X,
         yPosition: CHART_LABEL_BOT_Y,
         width: CHART_TOTAL_W,
@@ -138,7 +149,7 @@ export async function showRainScreen(w: WeatherData): Promise<void> {
     imageObject: [
       new ImageContainerProperty({
         containerID: 7,
-        containerName: 'total',
+        containerName: 'presnum',
         xPosition: CHART_TOTAL_X,
         yPosition: CHART_TOTAL_Y,
         width: CHART_TOTAL_W,
@@ -147,6 +158,15 @@ export async function showRainScreen(w: WeatherData): Promise<void> {
     ],
   })
 
-  await sendImage(renderDottedNumberBytes(totalStr, CHART_TOTAL_W, CHART_TOTAL_H, CHART_HEADLINE_OPTS), 7, 'total')
+  // Tight charGap so 4-char values ("1024", "29.9") fit CHART_TOTAL_W=216
+  // at dotSize=2 (the chart-screen default). Without a fixed opts the
+  // shared renderDottedNumberBytes autosizer bottoms out at dotSize=5, way
+  // too big for this column.
+  const PRESSURE_HEADLINE_OPTS = { dotSize: 2, dotGap: 1, cellGap: 1, charGap: 4 }
+  await sendImage(
+    renderDottedNumberBytes(currentStr, CHART_TOTAL_W, CHART_TOTAL_H, PRESSURE_HEADLINE_OPTS),
+    7,
+    'presnum',
+  )
   appendEventLog(`Screen: ${state.screen}`)
 }

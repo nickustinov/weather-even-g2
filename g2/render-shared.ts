@@ -12,7 +12,7 @@ import {
   type TextContainerProperty,
 } from '@evenrealities/even_hub_sdk'
 import { appendEventLog } from '../_shared/log'
-import { getPrecipUnit, getPressureUnit, getWindUnit } from './api'
+import { getPrecipUnit, getPressureUnit, getTimeUnit, getWindUnit } from './api'
 import { canvasToBytes } from './icons'
 import { state, getBridge } from './state'
 import { drawWeatherIcon } from './weather-icons'
@@ -30,6 +30,16 @@ export async function rebuildPage(config: {
 }): Promise<void> {
   const b = getBridge()
   if (!b) return
+
+  // Refresh the active-container set so any sendImage call still in flight
+  // from a previous show*Screen() won't try to paint into a container that
+  // no longer exists (= simulator warning "container X not found").
+  const next = new Set<number>()
+  for (const t of config.textObject ?? []) if (t.containerID !== undefined) next.add(t.containerID)
+  for (const i of config.imageObject ?? []) if (i.containerID !== undefined) next.add(i.containerID)
+  for (const l of config.listObject ?? []) if (l.containerID !== undefined) next.add(l.containerID)
+  state.activeContainerIds = next
+
   if (!state.startupRendered) {
     await b.createStartUpPageContainer(new CreateStartUpPageContainer(config))
     state.startupRendered = true
@@ -41,6 +51,12 @@ export async function rebuildPage(config: {
 export async function sendImage(bytes: number[], containerID: number, containerName: string): Promise<void> {
   const b = getBridge()
   if (!b) return
+  if (!state.activeContainerIds.has(containerID)) {
+    // Page rebuilt between this send being queued and dispatched. Skipping
+    // would otherwise produce a "container N not found" warning on the
+    // simulator with no visual effect on the glasses.
+    return
+  }
   const result = await b.updateImageRawData(
     new ImageRawDataUpdate({ containerID, containerName, imageData: bytes }),
   )
@@ -129,6 +145,22 @@ export function formatPressure(hPa: number): string {
   return `${hPa} hPa`
 }
 
+// Just the numeric portion in the user's chosen unit — used where the
+// pressure screen prints the value alone (column cells, big dotted number)
+// and the unit appears separately as a label. inHg is rounded to 1 decimal
+// so the 4-char "29.9" fits the big-dotted column at dotSize=2 (a 5-char
+// "29.85" would overflow CHART_TOTAL_W=216).
+export function formatPressureValue(hPa: number): string {
+  const u = getPressureUnit()
+  if (u === 'inHg') return (hPa * 0.02953).toFixed(1)
+  if (u === 'mmHg') return String(Math.round(hPa * 0.75006))
+  return String(hPa)
+}
+
+export function pressureUnitLabel(): string {
+  return getPressureUnit()
+}
+
 // ---------------------------------------------------------------------------
 // Date / time helpers
 // ---------------------------------------------------------------------------
@@ -144,6 +176,33 @@ export function timeToMinutes(hhmm: string): number {
   const parts = hhmm.split(':')
   if (parts.length !== 2) return 0
   return Number(parts[0]) * 60 + Number(parts[1])
+}
+
+// Convert canonical 24h "HH:MM" to user-facing 12h "6:00 AM" form.
+function to12h(hhmm: string): string {
+  const [hStr, mStr] = hhmm.split(':')
+  const h = Number(hStr)
+  if (!Number.isFinite(h)) return hhmm
+  const suffix = h >= 12 ? 'PM' : 'AM'
+  const h12 = h % 12 === 0 ? 12 : h % 12
+  return `${h12}:${mStr} ${suffix}`
+}
+
+function to12hCompact(hhmm: string): string {
+  const [hStr, mStr] = hhmm.split(':')
+  const h = Number(hStr)
+  if (!Number.isFinite(h)) return hhmm
+  const suffix = h >= 12 ? 'p' : 'a'
+  const h12 = h % 12 === 0 ? 12 : h % 12
+  return `${h12}:${mStr}${suffix}`
+}
+
+// Display a stored 24h "HH:MM" in the user's chosen format. Use compact=true
+// for narrow columns (hourly grids, chart tick labels) where "6:00 PM"
+// would wrap.
+export function displayTime(hhmm: string, compact = false): string {
+  if (getTimeUnit() === '24h') return hhmm
+  return compact ? to12hCompact(hhmm) : to12h(hhmm)
 }
 
 export function formatHm(mins: number): string {

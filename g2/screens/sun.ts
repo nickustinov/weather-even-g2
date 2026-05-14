@@ -21,6 +21,7 @@ import {
   CHART_PAD,
   daylightRemaining,
   dayProgress,
+  displayTime,
   formatHm,
   rebuildPage,
   sendImage,
@@ -67,7 +68,7 @@ function sunLabels(): string {
 }
 
 function sunValues(w: WeatherData): string {
-  return [w.sunrise, w.sunset].join('\n')
+  return [displayTime(w.sunrise), displayTime(w.sunset)].join('\n')
 }
 
 function sunProgressLine(w: WeatherData): string {
@@ -109,8 +110,8 @@ export async function showSunScreen(w: WeatherData): Promise<void> {
   const moonHeadText = `${moon.name}\n${moon.illumination}% illuminated`
   const statsLabels = ['moonrise', 'moonset', 'full in', 'distance'].join('\n')
   const statsValues = [
-    formatHHMM(times.rise),
-    formatHHMM(times.set),
+    displayTime(formatHHMM(times.rise)),
+    displayTime(formatHHMM(times.set)),
     `${daysToFull} d`,
     distance !== null ? `${distance.toLocaleString()} km` : '–',
   ].join('\n')

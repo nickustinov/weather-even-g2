@@ -45,6 +45,7 @@ export type HourlyPoint = {
   humidity: number
   dewPoint: number
   uvIndex: number
+  pressure: number
 }
 
 export type DailyPoint = {
@@ -97,7 +98,7 @@ export type WeatherData = {
   airQuality: AirQuality | null
 }
 
-export const SCREENS = ['today', 'forecast', 'rain', 'wind', 'humidity', 'uv', 'air', 'sun', 'hours'] as const
+export const SCREENS = ['today', 'forecast', 'rain', 'wind', 'humidity', 'pressure', 'uv', 'air', 'sun', 'hours'] as const
 export type Screen = (typeof SCREENS)[number]
 
 export const SCREEN_LABELS: Record<Screen, string> = {
@@ -110,6 +111,7 @@ export const SCREEN_LABELS: Record<Screen, string> = {
   air: 'Air quality',
   sun: 'Sun & moon',
   hours: 'Next hours',
+  pressure: 'Pressure',
 }
 
 // User preferences for the navigation carousel. Storage layer (api.ts) caches
@@ -125,6 +127,10 @@ export type State = {
   // Modal overlay — when non-null events route to the modal handler and
   // the modal renderer draws over the regular screen rotation.
   modal: 'cities' | null
+  // Container IDs currently present on the page. Maintained by rebuildPage
+  // so that any sendImage call queued from a previous render is dropped
+  // instead of targeting a no-longer-existing container.
+  activeContainerIds: Set<number>
 }
 
 export const state: State = {
@@ -133,6 +139,7 @@ export const state: State = {
   startupRendered: false,
   weather: null,
   modal: null,
+  activeContainerIds: new Set(),
 }
 
 let _bridge: EvenAppBridge | null = null

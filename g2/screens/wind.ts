@@ -28,6 +28,7 @@ import {
   CHART_TOTAL_Y,
   CHART_VALUES_W,
   CHART_VALUES_X,
+  displayTime,
   rebuildPage,
   renderDottedNumberBytes,
   sendImage,
@@ -46,7 +47,7 @@ function windArrow(deg: number): string {
 }
 
 function windTimesText(w: WeatherData): string {
-  return w.hourly.slice(0, CHART_HOURS_VISIBLE).map(h => h.time).join('\n')
+  return w.hourly.slice(0, CHART_HOURS_VISIBLE).map(h => displayTime(h.time, true)).join('\n')
 }
 
 function windBarsText(w: WeatherData): string {
