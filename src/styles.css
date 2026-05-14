@@ -32,16 +32,31 @@
 html, body {
   height: 100%;
   margin: 0;
+  overflow: hidden;
 }
 
 body {
   font-family: var(--font-body);
   background: var(--color-bg);
   color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  flex-direction: column;
+}
+
+/* #app is the actual scroll container — the Even Hub WebView doesn't
+   reliably scroll the body itself, so we constrain html+body to the
+   viewport and let the #app div handle vertical overflow internally. */
+#app {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   max-width: 480px;
+  width: 100%;
   margin: 0 auto;
   padding: var(--spacing-card-margin);
-  -webkit-font-smoothing: antialiased;
+  box-sizing: border-box;
 }
 
 a {

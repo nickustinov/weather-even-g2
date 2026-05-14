@@ -68,8 +68,11 @@ function todayDegreePosition(temp: number): { x: number; y: number } {
   // renderDottedNumberBytes draws at x=4 inside the temp canvas, vertically
   // centered. Icon sits below the visible glyph bounds.
   const yOffset = Math.floor((TODAY_TEMP_H - measured.height) / 2)
+  // 3-char temps ("105", "-12") push the icon past the right-side stats
+  // column; shift back 10px to keep the icon inside the headline area.
+  const wideAdjust = String(temp).length >= 3 ? -20 : 0
   return {
-    x: TODAY_TEMP_X + 4 + prefixWidth + charGap + 14,
+    x: TODAY_TEMP_X + 4 + prefixWidth + charGap + 14 + wideAdjust,
     y: TODAY_TEMP_Y + yOffset + measured.height - 23,
   }
 }

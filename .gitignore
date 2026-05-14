@@ -2,3 +2,4 @@ node_modules/
 dist/
 *.ehpk
 .DS_Store
+glasses_*.png

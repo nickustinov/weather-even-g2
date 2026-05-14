@@ -147,9 +147,14 @@ function CitiesEditor() {
     if (timerRef.current) clearTimeout(timerRef.current)
     setQuery('')
     setResults([])
+    const inputEl = document.getElementById('city-search') as HTMLInputElement | null
+    inputEl?.blur()
     await addCity(city)
+    // Note: deliberately NOT calling autoConnect() here. The bridge is
+    // already connected from the initial useEffect; clicking #connectBtn
+    // again triggers a fresh SDK connect flow that has been observed to
+    // lock browser-side page scrolling on the Even webview.
     void refreshWeather()
-    autoConnect()
   }
 
   const handleSelect = async (city: City) => {
@@ -189,7 +194,7 @@ function CitiesEditor() {
                   zIndex: isDragging ? 10 : undefined,
                   boxShadow: isDragging ? '0 8px 24px rgba(0,0,0,0.4)' : undefined,
                   opacity: isDragging ? 0.92 : 1,
-                  touchAction: 'none',
+                  touchAction: isDragging ? 'none' : undefined,
                 }}
               >
                 <span
@@ -488,7 +493,10 @@ function ScreensEditor() {
                 zIndex: isDragging ? 10 : undefined,
                 boxShadow: isDragging ? '0 8px 24px rgba(0,0,0,0.4)' : undefined,
                 opacity: isDragging ? 0.92 : pref.enabled ? 1 : 0.55,
-                touchAction: 'none',
+                // touchAction lives on the drag handle only — applying it
+                // to the whole row would block page scrolling when the
+                // user starts a touch anywhere on this row.
+                touchAction: isDragging ? 'none' : undefined,
               }}
             >
               <span
@@ -572,13 +580,6 @@ function SettingsPanel() {
       <h2 className="text-large-title" style={{ margin: 'var(--spacing-cross) 0' }}>Screens</h2>
       <ScreensEditor />
 
-      <button
-        className="weather-btn text-medium-title"
-        style={{ width: '100%', marginTop: 'var(--spacing-section)' }}
-        onClick={() => void refreshWeather()}
-      >
-        Refresh forecast
-      </button>
     </div>
   )
 }

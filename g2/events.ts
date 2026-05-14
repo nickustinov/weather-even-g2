@@ -2,61 +2,25 @@ import { OsEventTypeList, type EvenHubEvent } from '@evenrealities/even_hub_sdk'
 import { appendEventLog } from '../_shared/log'
 import { getBridge, state } from './state'
 import { showScreen, nextScreen, prevScreen, showCityPickerScreen } from './renderer'
-import { onForegroundEnter, onAppExit, refreshWeather } from './app'
+import { onForegroundEnter, onForegroundExit, onAppExit, refreshWeather } from './app'
 import { cityKey, getCities, setActiveCity } from './api'
 
-// Scroll cooldown to prevent duplicate actions from rapid swipes
-const SCROLL_COOLDOWN_MS = 300
-let lastScrollTime = 0
+// Drop incoming events while a previous async handler is still in flight.
+// Without this guard, a single physical tap can register twice — once on
+// the page that was active when the tap began, and once on the page that
+// was just rebuilt by the first event's handler (e.g. opening the city
+// picker via tap, then immediately seeing the picker dismiss because the
+// same tap landed on the list's "‹ Back" item).
+let processing = false
 
-function scrollThrottled(): boolean {
-  const now = Date.now()
-  if (now - lastScrollTime < SCROLL_COOLDOWN_MS) return true
-  lastScrollTime = now
-  return false
-}
-
-// ---------------------------------------------------------------------------
-// Event normalisation
-// ---------------------------------------------------------------------------
-
-export function resolveEventType(event: EvenHubEvent): OsEventTypeList | undefined {
-  const raw =
-    event.listEvent?.eventType ??
-    event.textEvent?.eventType ??
-    event.sysEvent?.eventType
-
-  if (typeof raw === 'number') {
-    switch (raw) {
-      case 0: return OsEventTypeList.CLICK_EVENT
-      case 1: return OsEventTypeList.SCROLL_TOP_EVENT
-      case 2: return OsEventTypeList.SCROLL_BOTTOM_EVENT
-      case 3: return OsEventTypeList.DOUBLE_CLICK_EVENT
-      case 4: return OsEventTypeList.FOREGROUND_ENTER_EVENT
-      case 5: return OsEventTypeList.FOREGROUND_EXIT_EVENT
-      case 6: return OsEventTypeList.ABNORMAL_EXIT_EVENT
-      case 7: return OsEventTypeList.SYSTEM_EXIT_EVENT
-      default: return undefined
-    }
-  }
-
-  // Protobuf omits zero values, so eventType=0 (CLICK_EVENT) arrives as undefined.
-  // Treat any container event with no eventType as a single click.
-  if (event.listEvent || event.textEvent || event.sysEvent) return OsEventTypeList.CLICK_EVENT
-
-  return undefined
-}
-
-// ---------------------------------------------------------------------------
-// Dispatcher
-// ---------------------------------------------------------------------------
-
+// Per handle-input docs: protobuf strips zero-value fields, so
+// listEvent.currentSelectItemIndex for item 0 arrives as undefined.
 function readListIndex(event: EvenHubEvent): number {
   const idx = event.listEvent?.currentSelectItemIndex
   return typeof idx === 'number' && idx >= 0 ? idx : 0
 }
 
-async function handleCityPickerClick(event: EvenHubEvent): Promise<void> {
+async function handleCityPickerSelect(event: EvenHubEvent): Promise<void> {
   const idx = readListIndex(event)
   if (idx === 0) {
     // "‹ Back" — dismiss without changing the active city.
@@ -73,74 +37,102 @@ async function handleCityPickerClick(event: EvenHubEvent): Promise<void> {
   }
   await setActiveCity(cityKey(target))
   state.modal = null
+  // refreshWeather repaints via firstScreen() + showScreen() at the end.
   await refreshWeather()
-  // refreshWeather already calls showScreen via firstScreen(); no extra paint.
 }
 
-export function onEvenHubEvent(event: EvenHubEvent): void {
-  const eventType = resolveEventType(event)
-  appendEventLog(`Event: type=${String(eventType)} screen=${state.screen} modal=${state.modal ?? '-'}`)
+// Returns a Promise iff the event triggered an async page rebuild; the
+// caller uses that to gate the `processing` flag.
+function dispatch(event: EvenHubEvent): Promise<void> | void {
+  // --- Lifecycle (sysEvent, always handled even if not on the active page).
+  if (event.sysEvent) {
+    const sysType = event.sysEvent.eventType ?? 0
+    if (sysType === OsEventTypeList.FOREGROUND_ENTER_EVENT) {
+      appendEventLog('Lifecycle: foreground enter')
+      return onForegroundEnter()
+    }
+    if (sysType === OsEventTypeList.FOREGROUND_EXIT_EVENT) {
+      appendEventLog('Lifecycle: foreground exit')
+      onForegroundExit()
+      return
+    }
+    if (
+      sysType === OsEventTypeList.ABNORMAL_EXIT_EVENT ||
+      sysType === OsEventTypeList.SYSTEM_EXIT_EVENT
+    ) {
+      appendEventLog(`Lifecycle: ${sysType === OsEventTypeList.ABNORMAL_EXIT_EVENT ? 'abnormal' : 'system'} exit`)
+      onAppExit()
+      return
+    }
+    // Fall through for double-click (3) and click (0) — they're handled
+    // by the screen-state dispatch below.
+  }
 
-  // Modal: city picker captures all clicks and double-clicks.
+  // --- City picker modal owns the input while it's up.
   if (state.modal === 'cities') {
-    if (eventType === OsEventTypeList.CLICK_EVENT) {
-      void handleCityPickerClick(event)
-      return
+    // Single tap on the list container fires listEvent (with idx).
+    if (event.listEvent) {
+      return handleCityPickerSelect(event)
     }
-    if (eventType === OsEventTypeList.DOUBLE_CLICK_EVENT) {
+    // Double-tap on a list container still comes via sysEvent (per docs).
+    if (event.sysEvent && (event.sysEvent.eventType ?? 0) === OsEventTypeList.DOUBLE_CLICK_EVENT) {
       state.modal = null
-      void showScreen()
-      return
+      return showScreen()
     }
-    // Scroll events are handled internally by the firmware list container.
     return
   }
 
-  switch (eventType) {
-    case OsEventTypeList.CLICK_EVENT: {
-      // Tap opens the city picker. We log the decision so a missing reaction
-      // is easy to diagnose in the event log (the most common cause is the
-      // user only having one city saved).
-      const n = getCities().length
-      appendEventLog(`Click: cities=${n} → ${n > 1 ? 'open picker' : 'ignored'}`)
-      if (n > 1) {
-        void showCityPickerScreen()
-      }
-      break
-    }
-
-    case OsEventTypeList.SCROLL_BOTTOM_EVENT:
-      // Swipe down = next screen (matches the natural reading order).
-      if (!scrollThrottled()) {
-        nextScreen()
-        void showScreen()
-      }
-      break
-
-    case OsEventTypeList.SCROLL_TOP_EVENT:
+  // --- Weather screens (text container with isEventCapture=1).
+  // Scrolls only fire as textEvent on text containers, with eventType
+  // 1 (scroll up) or 2 (scroll down). No click ever fires as textEvent.
+  if (event.textEvent) {
+    const type = event.textEvent.eventType ?? 0
+    if (type === OsEventTypeList.SCROLL_TOP_EVENT) {
       // Swipe up = previous screen.
-      if (!scrollThrottled()) {
-        prevScreen()
-        void showScreen()
-      }
-      break
+      prevScreen()
+      return showScreen()
+    }
+    if (type === OsEventTypeList.SCROLL_BOTTOM_EVENT) {
+      // Swipe down = next screen.
+      nextScreen()
+      return showScreen()
+    }
+    return
+  }
 
-    case OsEventTypeList.DOUBLE_CLICK_EVENT:
-      // Weather has no back stack – every screen is "root"-level,
-      // reached by horizontal swipe. Double-tap is conventionally the
-      // exit gesture, so invoke the host exit dialogue from anywhere.
-      // This also satisfies the Even Hub submission requirement.
+  // Clicks on text containers route through sysEvent (per handle-input).
+  if (event.sysEvent) {
+    const type = event.sysEvent.eventType ?? 0
+    if (type === OsEventTypeList.CLICK_EVENT) {
+      // Tap opens the city picker as long as we have at least one city
+      // saved. With one city it doubles as a "refresh current city"
+      // affordance (tap the only city to re-fetch).
+      const n = getCities().length
+      appendEventLog(`Click: cities=${n} → ${n >= 1 ? 'open picker' : 'ignored'}`)
+      if (n >= 1) return showCityPickerScreen()
+      return
+    }
+    if (type === OsEventTypeList.DOUBLE_CLICK_EVENT) {
+      // Even Hub submission requirement: double-tap on the root screen
+      // invokes the system exit dialog. Don't tear down yet — the user
+      // can still cancel; teardown happens in the ABNORMAL/SYSTEM exit
+      // handlers above if they confirm.
       void getBridge()?.shutDownPageContainer(1)
-      break
+      return
+    }
+  }
+}
 
-    case OsEventTypeList.FOREGROUND_ENTER_EVENT:
-      void onForegroundEnter()
-      break
+export function onEvenHubEvent(event: EvenHubEvent): void {
+  if (processing) {
+    appendEventLog(`Event dropped (busy) screen=${state.screen} modal=${state.modal ?? '-'}`)
+    return
+  }
+  appendEventLog(`Event screen=${state.screen} modal=${state.modal ?? '-'}`)
 
-    case OsEventTypeList.FOREGROUND_EXIT_EVENT:
-    case OsEventTypeList.ABNORMAL_EXIT_EVENT:
-    case OsEventTypeList.SYSTEM_EXIT_EVENT:
-      onAppExit()
-      break
+  const result = dispatch(event)
+  if (result instanceof Promise) {
+    processing = true
+    void result.finally(() => { processing = false })
   }
 }

@@ -42,7 +42,6 @@ function stopRefreshLoop(): void {
 }
 
 export async function onForegroundEnter(): Promise<void> {
-  appendEventLog('Lifecycle: foreground enter')
   startRefreshLoop()
   if (getSavedCity()) {
     await refreshWeather()
@@ -51,8 +50,17 @@ export async function onForegroundEnter(): Promise<void> {
   }
 }
 
+// FOREGROUND_EXIT (type 5) means the app went to background — the SDK is
+// still alive and the user might come back. Per handle-input docs we just
+// pause the periodic refresh; full teardown waits for ABNORMAL/SYSTEM
+// exit events.
+export function onForegroundExit(): void {
+  stopRefreshLoop()
+}
+
+// Called on ABNORMAL_EXIT (6) or SYSTEM_EXIT (7) — user has confirmed
+// exit (or the host force-killed the app). Detach hardware listeners.
 export function onAppExit(): void {
-  appendEventLog('Lifecycle: app exit – cleaning up')
   stopRefreshLoop()
   unsubscribeEvents?.()
   unsubscribeEvents = null
