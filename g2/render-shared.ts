@@ -178,12 +178,13 @@ export function timeToMinutes(hhmm: string): number {
   return Number(parts[0]) * 60 + Number(parts[1])
 }
 
-// Convert canonical 24h "HH:MM" to user-facing 12h "6:00 AM" form.
+// Convert canonical 24h "HH:MM" to user-facing 12h "6:00 am" form. Lowercase
+// am/pm with a space matches the rest of the app's lowercase aesthetic.
 function to12h(hhmm: string): string {
   const [hStr, mStr] = hhmm.split(':')
   const h = Number(hStr)
   if (!Number.isFinite(h)) return hhmm
-  const suffix = h >= 12 ? 'PM' : 'AM'
+  const suffix = h >= 12 ? 'pm' : 'am'
   const h12 = h % 12 === 0 ? 12 : h % 12
   return `${h12}:${mStr} ${suffix}`
 }
@@ -192,8 +193,11 @@ function to12hCompact(hhmm: string): string {
   const [hStr, mStr] = hhmm.split(':')
   const h = Number(hStr)
   if (!Number.isFinite(h)) return hhmm
-  const suffix = h >= 12 ? 'p' : 'a'
+  const suffix = h >= 12 ? 'pm' : 'am'
   const h12 = h % 12 === 0 ? 12 : h % 12
+  // No space — "12 pm" overflows the 52px inner times column, "12pm" fits.
+  // Open-Meteo hourly readings are always on the hour, so we drop ":00".
+  if (mStr === '00') return `${h12}${suffix}`
   return `${h12}:${mStr}${suffix}`
 }
 

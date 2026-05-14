@@ -238,7 +238,11 @@ function CitiesEditor() {
                   ⋮⋮
                 </span>
                 <ActiveRadio active={isActive} onSelect={() => handleSelect(city)} />
-                <span className="text-medium-body" style={{ flex: 1, color: 'var(--color-text)' }}>
+                <span
+                  className="text-medium-body"
+                  style={{ flex: 1, color: 'var(--color-text)', cursor: 'pointer' }}
+                  onClick={() => handleSelect(city)}
+                >
                   {cityLabel(city)}
                 </span>
                 <button
@@ -537,7 +541,15 @@ function ScreensEditor() {
                 disabled={isLastEnabled}
                 onChange={() => toggle(pref.id)}
               />
-              <span className="text-medium-body" style={{ flex: 1, color: 'var(--color-text)' }}>
+              <span
+                className="text-medium-body"
+                style={{
+                  flex: 1,
+                  color: 'var(--color-text)',
+                  cursor: isLastEnabled ? 'not-allowed' : 'pointer',
+                }}
+                onClick={() => { if (!isLastEnabled) toggle(pref.id) }}
+              >
                 {SCREEN_LABELS[pref.id]}
               </span>
             </li>
