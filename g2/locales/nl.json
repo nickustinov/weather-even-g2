@@ -60,6 +60,7 @@
     "label_pressure": "luchtdruk",
     "label_air_quality": "luchtkwaliteit",
     "eu_aqi": "eu aqi",
+    "us_aqi": "us aqi",
     "air_unavailable": "geen luchtdata beschikbaar",
     "sunrise": "opkomst",
     "sunset": "ondergang",
@@ -131,6 +132,14 @@
     "very_poor": "zeer slecht",
     "extremely_poor": "extreem slecht"
   },
+  "us_aqi_category": {
+    "good": "goed",
+    "moderate": "matig",
+    "unhealthy_sensitive": "ongezond gevoel.",
+    "unhealthy": "ongezond",
+    "very_unhealthy": "zeer ongezond",
+    "hazardous": "gevaarlijk"
+  },
   "pollen_category": {
     "low": "laag",
     "moderate": "matig",
@@ -176,6 +185,8 @@
     "inHg": "inHg",
     "mmHg": "mmHg",
     "24h": "24u",
-    "12h": "12u"
+    "12h": "12u",
+    "eu": "EU",
+    "us": "US"
   }
 }

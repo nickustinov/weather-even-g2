@@ -60,6 +60,7 @@
     "label_pressure": "기압",
     "label_air_quality": "공기질",
     "eu_aqi": "eu aqi",
+    "us_aqi": "us aqi",
     "air_unavailable": "공기질 데이터 없음",
     "sunrise": "일출",
     "sunset": "일몰",
@@ -131,6 +132,14 @@
     "very_poor": "매우 나쁨",
     "extremely_poor": "최악"
   },
+  "us_aqi_category": {
+    "good": "좋음",
+    "moderate": "보통",
+    "unhealthy_sensitive": "민감군 유해",
+    "unhealthy": "유해",
+    "very_unhealthy": "매우 유해",
+    "hazardous": "위험"
+  },
   "pollen_category": {
     "low": "낮음",
     "moderate": "보통",
@@ -176,6 +185,8 @@
     "inHg": "inHg",
     "mmHg": "mmHg",
     "24h": "24시",
-    "12h": "12시"
+    "12h": "12시",
+    "eu": "EU",
+    "us": "US"
   }
 }

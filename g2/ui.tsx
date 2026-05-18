@@ -344,6 +344,7 @@ function UnitPicker() {
   const precipOpts = ['mm', 'in'].map(unitOpt)
   const pressureOpts = ['hPa', 'inHg', 'mmHg'].map(unitOpt)
   const timeOpts = ['24h', '12h'].map(unitOpt)
+  const aqiOpts = ['eu', 'us'].map(unitOpt)
 
   return (
     <div className="weather-card">
@@ -352,6 +353,7 @@ function UnitPicker() {
       <UnitRow label={t('browser.precipitation')} options={precipOpts} value={prefs.precip} onChange={(v) => void update({ precip: v as UnitPrefs['precip'] })} />
       <UnitRow label={t('browser.pressure')} options={pressureOpts} value={prefs.pressure} onChange={(v) => void update({ pressure: v as UnitPrefs['pressure'] })} />
       <UnitRow label={t('browser.time')} options={timeOpts} value={prefs.time} onChange={(v) => void update({ time: v as UnitPrefs['time'] })} />
+      <UnitRow label={t('screen_label.air')} options={aqiOpts} value={prefs.aqi} onChange={(v) => void update({ aqi: v as UnitPrefs['aqi'] })} />
     </div>
   )
 }

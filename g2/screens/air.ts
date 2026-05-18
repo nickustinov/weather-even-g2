@@ -6,9 +6,8 @@ import { appendEventLog } from '../../_shared/log'
 import { DISPLAY_WIDTH } from '../layout'
 import {
   aqiCategory,
-  dominantPollen,
+  getAqiScale,
   hasPollenData,
-  pollenCategory,
   pollenScaleMax,
   pollenSpeciesLabel,
 } from '../api'
@@ -127,14 +126,14 @@ export async function showAirScreen(w: WeatherData): Promise<void> {
 
   const usePollen = hasPollenData(aq.pollen)
   const rows = usePollen ? pollenRows(aq.pollen) : pollutantRows(aq)
-  const aqiStr = String(aq.euAqi)
+  const scale = getAqiScale()
+  const aqiValue = scale === 'us' ? aq.usAqi : aq.euAqi
+  const aqiStr = String(aqiValue)
 
-  // Header subtitle: dominant allergen + its category if pollen data exists,
-  // else fall back to the AQI category.
-  const dom = usePollen ? dominantPollen(aq.pollen) : null
-  const headerExtra = dom
-    ? `${pollenSpeciesLabel(dom.species)} ${pollenCategory(dom.species, dom.value)}`
-    : aqiCategory(aq.euAqi)
+  // Header subtitle is always the AQI category so users see the overall
+  // air-quality reading at a glance. The pollen detail (which species is
+  // elevated and by how much) is fully visible in the bars + values column.
+  const headerExtra = aqiCategory(aqiValue)
 
   await rebuildPage({
     containerTotalNum: 7,
@@ -197,7 +196,7 @@ export async function showAirScreen(w: WeatherData): Promise<void> {
       new TextContainerProperty({
         containerID: 6,
         containerName: 'aqiunit',
-        content: t('glasses.eu_aqi'),
+        content: scale === 'us' ? t('glasses.us_aqi') : t('glasses.eu_aqi'),
         xPosition: CHART_TOTAL_X,
         yPosition: CHART_LABEL_BOT_Y,
         width: CHART_TOTAL_W,

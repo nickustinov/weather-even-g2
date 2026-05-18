@@ -60,6 +60,7 @@
     "label_pressure": "pressão",
     "label_air_quality": "qualidade ar",
     "eu_aqi": "eu aqi",
+    "us_aqi": "us aqi",
     "air_unavailable": "dados do ar indisponíveis",
     "sunrise": "amanhecer",
     "sunset": "anoitecer",
@@ -131,6 +132,14 @@
     "very_poor": "muito ruim",
     "extremely_poor": "péssima"
   },
+  "us_aqi_category": {
+    "good": "boa",
+    "moderate": "moderada",
+    "unhealthy_sensitive": "nociva sensíveis",
+    "unhealthy": "nociva",
+    "very_unhealthy": "muito nociva",
+    "hazardous": "perigosa"
+  },
   "pollen_category": {
     "low": "baixo",
     "moderate": "moderado",
@@ -176,6 +185,8 @@
     "inHg": "inHg",
     "mmHg": "mmHg",
     "24h": "24h",
-    "12h": "12h"
+    "12h": "12h",
+    "eu": "EU",
+    "us": "US"
   }
 }

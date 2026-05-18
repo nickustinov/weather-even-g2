@@ -60,6 +60,7 @@
     "label_pressure": "давление",
     "label_air_quality": "воздух",
     "eu_aqi": "eu aqi",
+    "us_aqi": "us aqi",
     "air_unavailable": "данные о воздухе недоступны",
     "sunrise": "восход",
     "sunset": "закат",
@@ -131,6 +132,14 @@
     "very_poor": "очень плохой",
     "extremely_poor": "крайне плохой"
   },
+  "us_aqi_category": {
+    "good": "хороший",
+    "moderate": "средний",
+    "unhealthy_sensitive": "вредно чувств.",
+    "unhealthy": "вредно",
+    "very_unhealthy": "очень вредно",
+    "hazardous": "опасно"
+  },
   "pollen_category": {
     "low": "низкая",
     "moderate": "средняя",
@@ -176,6 +185,8 @@
     "inHg": "inHg",
     "mmHg": "мм рт",
     "24h": "24ч",
-    "12h": "12ч"
+    "12h": "12ч",
+    "eu": "EU",
+    "us": "US"
   }
 }

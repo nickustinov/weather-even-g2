@@ -60,6 +60,7 @@
     "label_pressure": "气压",
     "label_air_quality": "空气质量",
     "eu_aqi": "eu aqi",
+    "us_aqi": "us aqi",
     "air_unavailable": "空气数据不可用",
     "sunrise": "日出",
     "sunset": "日落",
@@ -131,6 +132,14 @@
     "very_poor": "很差",
     "extremely_poor": "极差"
   },
+  "us_aqi_category": {
+    "good": "良好",
+    "moderate": "中等",
+    "unhealthy_sensitive": "敏感人群不健康",
+    "unhealthy": "不健康",
+    "very_unhealthy": "非常不健康",
+    "hazardous": "危险"
+  },
   "pollen_category": {
     "low": "低",
     "moderate": "中",
@@ -176,6 +185,8 @@
     "inHg": "inHg",
     "mmHg": "毫米汞",
     "24h": "24时",
-    "12h": "12时"
+    "12h": "12时",
+    "eu": "EU",
+    "us": "US"
   }
 }

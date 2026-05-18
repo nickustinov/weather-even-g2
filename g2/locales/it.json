@@ -60,6 +60,7 @@
     "label_pressure": "pressione",
     "label_air_quality": "qualità aria",
     "eu_aqi": "eu aqi",
+    "us_aqi": "us aqi",
     "air_unavailable": "dati aria non disponibili",
     "sunrise": "alba",
     "sunset": "tramonto",
@@ -131,6 +132,14 @@
     "very_poor": "molto scarsa",
     "extremely_poor": "pessima"
   },
+  "us_aqi_category": {
+    "good": "buona",
+    "moderate": "moderata",
+    "unhealthy_sensitive": "nociva sensibili",
+    "unhealthy": "nociva",
+    "very_unhealthy": "molto nociva",
+    "hazardous": "pericolosa"
+  },
   "pollen_category": {
     "low": "basso",
     "moderate": "moderato",
@@ -176,6 +185,8 @@
     "inHg": "inHg",
     "mmHg": "mmHg",
     "24h": "24h",
-    "12h": "12h"
+    "12h": "12h",
+    "eu": "EU",
+    "us": "US"
   }
 }

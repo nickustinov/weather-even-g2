@@ -60,6 +60,7 @@
     "label_pressure": "気圧",
     "label_air_quality": "空気質",
     "eu_aqi": "eu aqi",
+    "us_aqi": "us aqi",
     "air_unavailable": "空気質データなし",
     "sunrise": "日の出",
     "sunset": "日の入",
@@ -131,6 +132,14 @@
     "very_poor": "非常に悪い",
     "extremely_poor": "最悪"
   },
+  "us_aqi_category": {
+    "good": "良い",
+    "moderate": "普通",
+    "unhealthy_sensitive": "敏感層に有害",
+    "unhealthy": "有害",
+    "very_unhealthy": "非常に有害",
+    "hazardous": "危険"
+  },
   "pollen_category": {
     "low": "弱い",
     "moderate": "普通",
@@ -176,6 +185,8 @@
     "inHg": "inHg",
     "mmHg": "mmHg",
     "24h": "24時",
-    "12h": "12時"
+    "12h": "12時",
+    "eu": "EU",
+    "us": "US"
   }
 }

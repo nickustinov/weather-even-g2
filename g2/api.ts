@@ -1,6 +1,6 @@
 import type { EvenAppBridge } from '@evenrealities/even_hub_sdk'
 import type {
-  AirQuality, City, Pollen, ScreenPref, Screen,
+  AirQuality, AqiScale, City, Pollen, ScreenPref, Screen,
   TempUnit, WindUnit, PrecipUnit, PressureUnit, TimeUnit, UnitPrefs,
   UnitSystem,
   WeatherData, HourlyPoint, DailyPoint,
@@ -80,7 +80,7 @@ export async function loadSettings(b: EvenAppBridge): Promise<void> {
   } else {
     const rawLegacyUnit = await b.getLocalStorage(UNIT_KEY)
     if (rawLegacyUnit === 'imperial') {
-      cachedUnitPrefs = { temp: 'F', wind: 'mph', precip: 'in', pressure: 'inHg', time: '12h' }
+      cachedUnitPrefs = { temp: 'F', wind: 'mph', precip: 'in', pressure: 'inHg', time: '12h', aqi: 'us' }
       await b.setLocalStorage(UNIT_PREFS_KEY, JSON.stringify(cachedUnitPrefs))
     }
   }
@@ -222,6 +222,7 @@ export function getWindUnit(): WindUnit { return cachedUnitPrefs.wind }
 export function getPrecipUnit(): PrecipUnit { return cachedUnitPrefs.precip }
 export function getPressureUnit(): PressureUnit { return cachedUnitPrefs.pressure }
 export function getTimeUnit(): TimeUnit { return cachedUnitPrefs.time }
+export function getAqiScale(): AqiScale { return cachedUnitPrefs.aqi }
 
 export async function setUnitPrefs(patch: Partial<UnitPrefs>): Promise<void> {
   cachedUnitPrefs = { ...cachedUnitPrefs, ...patch }
@@ -512,6 +513,7 @@ export async function fetchWeather(city: City, prefs: UnitPrefs = DEFAULT_UNIT_P
 type OpenMeteoAirQuality = {
   current?: {
     european_aqi?: number
+    us_aqi?: number
     pm2_5?: number
     pm10?: number
     nitrogen_dioxide?: number
@@ -540,7 +542,7 @@ async function fetchAirQuality(city: City): Promise<AirQuality | null> {
     latitude: String(city.latitude),
     longitude: String(city.longitude),
     current: [
-      'european_aqi', 'pm2_5', 'pm10', 'nitrogen_dioxide', 'ozone',
+      'european_aqi', 'us_aqi', 'pm2_5', 'pm10', 'nitrogen_dioxide', 'ozone',
       'sulphur_dioxide', 'carbon_monoxide',
       'alder_pollen', 'birch_pollen', 'grass_pollen', 'mugwort_pollen',
       'olive_pollen', 'ragweed_pollen',
@@ -553,6 +555,7 @@ async function fetchAirQuality(city: City): Promise<AirQuality | null> {
   const c = data.current ?? {}
   return {
     euAqi: Math.round(c.european_aqi ?? 0),
+    usAqi: Math.round(c.us_aqi ?? 0),
     pm2_5: Math.round((c.pm2_5 ?? 0) * 10) / 10,
     pm10: Math.round((c.pm10 ?? 0) * 10) / 10,
     nitrogenDioxide: Math.round((c.nitrogen_dioxide ?? 0) * 10) / 10,
@@ -647,8 +650,17 @@ export function uvCategoryShort(uv: number): string {
   return t('uv_category_short.extreme')
 }
 
-// EU air-quality index categories (0–100+ scale).
+// Air-quality category — switches between EU (0–100+ scale) and US EPA
+// (0–500 scale) bands based on the user's chosen AQI scale.
 export function aqiCategory(aqi: number): string {
+  if (cachedUnitPrefs.aqi === 'us') {
+    if (aqi <= 50) return t('us_aqi_category.good')
+    if (aqi <= 100) return t('us_aqi_category.moderate')
+    if (aqi <= 150) return t('us_aqi_category.unhealthy_sensitive')
+    if (aqi <= 200) return t('us_aqi_category.unhealthy')
+    if (aqi <= 300) return t('us_aqi_category.very_unhealthy')
+    return t('us_aqi_category.hazardous')
+  }
   if (aqi < 20) return t('aqi_category.good')
   if (aqi < 40) return t('aqi_category.fair')
   if (aqi < 60) return t('aqi_category.moderate')
@@ -735,11 +747,12 @@ function applyTestOverrides(w: WeatherData): WeatherData {
   if (anyAir || anyPollen) {
     const emptyPollen: Pollen = { alder: null, birch: null, grass: null, mugwort: null, olive: null, ragweed: null }
     const base: AirQuality = w.airQuality ?? {
-      euAqi: 0, pm2_5: 0, pm10: 0, nitrogenDioxide: 0, ozone: 0, sulphurDioxide: 0, carbonMonoxide: 0,
+      euAqi: 0, usAqi: 0, pm2_5: 0, pm10: 0, nitrogenDioxide: 0, ozone: 0, sulphurDioxide: 0, carbonMonoxide: 0,
       pollen: emptyPollen,
     }
     w.airQuality = {
       euAqi: aqi !== undefined ? Math.round(aqi) : base.euAqi,
+      usAqi: aqi !== undefined ? Math.round(aqi) : base.usAqi,
       pm2_5: pm25 !== undefined ? pm25 : base.pm2_5,
       pm10: pm10 !== undefined ? pm10 : base.pm10,
       nitrogenDioxide: no2 !== undefined ? no2 : base.nitrogenDioxide,

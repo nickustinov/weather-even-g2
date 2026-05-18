@@ -8,6 +8,7 @@ export type WindUnit = 'kmh' | 'mph' | 'ms'
 export type PrecipUnit = 'mm' | 'in'
 export type PressureUnit = 'hPa' | 'inHg' | 'mmHg'
 export type TimeUnit = '24h' | '12h'
+export type AqiScale = 'eu' | 'us'
 
 export type UnitPrefs = {
   temp: TempUnit
@@ -15,6 +16,7 @@ export type UnitPrefs = {
   precip: PrecipUnit
   pressure: PressureUnit
   time: TimeUnit
+  aqi: AqiScale
 }
 
 export const DEFAULT_UNIT_PREFS: UnitPrefs = {
@@ -23,6 +25,7 @@ export const DEFAULT_UNIT_PREFS: UnitPrefs = {
   precip: 'mm',
   pressure: 'hPa',
   time: '24h',
+  aqi: 'eu',
 }
 
 export type City = {
@@ -77,6 +80,7 @@ export type Pollen = {
 
 export type AirQuality = {
   euAqi: number
+  usAqi: number
   pm2_5: number
   pm10: number
   nitrogenDioxide: number
