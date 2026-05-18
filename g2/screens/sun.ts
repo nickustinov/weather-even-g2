@@ -35,8 +35,10 @@ const SUN_HALF_W = Math.floor(DISPLAY_WIDTH / 2)
 const LINE_H = 27
 
 // Left half: sunrise / sunset table + progress bar + day length.
+// Label column is wide enough for "untergang"/"восход луны"-class words;
+// time values only need ~60px so the extra goes into the label side.
 const SUN_LABEL_X = CHART_PAD
-const SUN_LABEL_W = 90
+const SUN_LABEL_W = 116
 const SUN_VALUE_X = SUN_LABEL_X + SUN_LABEL_W
 const SUN_VALUE_W = SUN_HALF_W - SUN_VALUE_X - 8
 const SUN_TIMES_Y = SUN_BODY_Y + 10

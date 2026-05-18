@@ -27,7 +27,6 @@ import {
   CHART_TOTAL_W,
   CHART_TOTAL_X,
   CHART_TOTAL_Y,
-  CHART_VALUES_W,
   CHART_VALUES_X,
   displayTime,
   rebuildPage,
@@ -42,6 +41,13 @@ import {
 // FROM). 'n' = northern wind, comes from the north, blows southward → ↓.
 // U+2190–U+2199 arrows are confirmed in the firmware font (even-g2-notes).
 const WIND_ARROWS = ['↓', '↙', '←', '↖', '↑', '↗', '→', '↘']
+
+// Wind's values column is wider than the shared CHART_VALUES_W because CJK
+// locales render 2-char compass labels (北東, 남서) alongside the speed
+// digit and arrow. We extend into the 12px gap that normally sits between
+// the values column and the big-number column — bars and total stay in the
+// same place so swiping between chart screens doesn't shift any layout.
+const WIND_VALUES_W = CHART_TOTAL_X - CHART_VALUES_X
 
 function windArrow(deg: number): string {
   return WIND_ARROWS[Math.round(deg / 45) % 8]
@@ -112,7 +118,7 @@ export async function showWindScreen(w: WeatherData): Promise<void> {
         content: windValuesText(w),
         xPosition: CHART_VALUES_X,
         yPosition: CHART_BODY_Y,
-        width: CHART_VALUES_W,
+        width: WIND_VALUES_W,
         height: CHART_BODY_H,
         isEventCapture: 0,
         paddingLength: 4,

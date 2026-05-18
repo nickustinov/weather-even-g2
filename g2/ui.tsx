@@ -614,11 +614,11 @@ function SettingsPanel() {
       <h2 className="text-large-title" style={{ margin: 'var(--spacing-cross) 0' }}>{t('browser.units')}</h2>
       <UnitPicker />
 
-      <h2 className="text-large-title" style={{ margin: 'var(--spacing-cross) 0' }}>{t('browser.screens')}</h2>
-      <ScreensEditor />
-
       <h2 className="text-large-title" style={{ margin: 'var(--spacing-cross) 0' }}>{t('browser.language')}</h2>
       <LanguagePicker />
+
+      <h2 className="text-large-title" style={{ margin: 'var(--spacing-cross) 0' }}>{t('browser.screens')}</h2>
+      <ScreensEditor />
 
     </div>
   )
