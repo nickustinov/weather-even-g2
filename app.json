@@ -19,7 +19,10 @@
         "https://geocoding-api.open-meteo.com",
         "https://air-quality-api.open-meteo.com",
         "http://www.w3.org",
-        "https://react.dev"
+        "https://react.dev",
+        "https://assets.lemonsqueezy.com",
+        "https://store.itsyapps.com",
+        "https://app.lemonsqueezy.com"
       ]
     }
   ]

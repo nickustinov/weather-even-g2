@@ -604,10 +604,97 @@ function useLocaleTick(): number {
   return tick
 }
 
+// Lemon Squeezy overlay checkout. lemon.js's auto-scan runs at
+// DOMContentLoaded, before React mounts this anchor — so we drive the
+// overlay programmatically and call Setup() to register an event handler
+// (without it the close-X postMessage from the overlay iframe has no
+// listener and the X appears dead).
+const LEMON_CHECKOUT_URL =
+  'https://store.itsyapps.com/checkout/buy/a94ce3c8-a375-4bc0-bb4f-74958ac037e8?embed=1&media=0&logo=0&desc=0&discount=0'
+
+type LemonSqueezy = {
+  Setup: (opts: { eventHandler: (event: { event: string }) => void }) => void
+  Url: {
+    Open: (url: string) => void
+    Close: () => void
+  }
+  Refresh: () => void
+}
+
+declare global {
+  interface Window {
+    createLemonSqueezy?: () => void
+    LemonSqueezy?: LemonSqueezy
+  }
+}
+
+async function ensureLemonReady(): Promise<LemonSqueezy | null> {
+  const start = Date.now()
+  while (Date.now() - start < 4000) {
+    if (window.LemonSqueezy) return window.LemonSqueezy
+    if (window.createLemonSqueezy) {
+      window.createLemonSqueezy()
+      if (window.LemonSqueezy) return window.LemonSqueezy
+    }
+    await new Promise(r => setTimeout(r, 100))
+  }
+  return null
+}
+
+let lemonInitialized = false
+function initLemonOnce(): void {
+  if (lemonInitialized) return
+  lemonInitialized = true
+  void ensureLemonReady().then(ls => {
+    if (!ls) return
+    ls.Setup({
+      eventHandler: () => {
+        // Closes the overlay when the iframe posts the close event. With no
+        // handler registered the X button's message is ignored by the
+        // parent window and the overlay stays open.
+      },
+    })
+  })
+}
+
+function BuyMeCoffeeButton() {
+  useEffect(() => { initLemonOnce() }, [])
+
+  const onClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault()
+    void ensureLemonReady().then(ls => {
+      if (ls) ls.Url.Open(LEMON_CHECKOUT_URL)
+      else window.open(LEMON_CHECKOUT_URL, '_blank')
+    })
+  }
+
+  return (
+    <a
+      href={LEMON_CHECKOUT_URL}
+      onClick={onClick}
+      style={{
+        display: 'block',
+        textAlign: 'center',
+        background: 'var(--color-accent-warning)',
+        color: '#232323',
+        textDecoration: 'none',
+        padding: '12px 16px',
+        borderRadius: 'var(--radius-default)',
+        fontWeight: 600,
+        marginBottom: 'var(--spacing-cross)',
+      }}
+    >
+      Enjoying Weather? ❤️ Buy me coffee
+    </a>
+  )
+}
+
 function SettingsPanel() {
   useLocaleTick()
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <BuyMeCoffeeButton />
+
       <h2 className="text-large-title" style={{ margin: '0 0 var(--spacing-cross)' }}>{t('browser.cities')}</h2>
       <CitiesEditor />
 

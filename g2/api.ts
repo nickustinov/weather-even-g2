@@ -103,6 +103,10 @@ export async function loadSettings(b: EvenAppBridge): Promise<void> {
   for (const cb of screenPrefsListeners) cb()
   for (const cb of citiesListeners) cb()
   for (const cb of unitPrefsListeners) cb()
+  // Fire locale listeners too so inline t() calls in browser UI components
+  // (section headings, log summary) re-render once the stored locale is
+  // applied — setLocaleSync above is silent and only updates the dictionary.
+  for (const cb of localeListeners) cb()
 }
 
 // Reconciles persisted prefs with the current SCREENS catalog: keeps any
