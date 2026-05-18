@@ -153,7 +153,7 @@ export async function showHoursScreen(w: WeatherData): Promise<void> {
   const leftHours = visible.slice(0, HOURS_PER_COL)
   const rightHours = visible.slice(HOURS_PER_COL)
 
-  const left = columnContainers(leftHours, 0, LEFT_IDS, 1)
+  const left = columnContainers(leftHours, 0, LEFT_IDS, 0)
   const right = columnContainers(rightHours, RIGHT_HALF_OFFSET, RIGHT_IDS, 0)
 
   await rebuildPage({
@@ -167,7 +167,7 @@ export async function showHoursScreen(w: WeatherData): Promise<void> {
         yPosition: 2,
         width: DISPLAY_WIDTH - 16,
         height: HOURS_HEADER_H,
-        isEventCapture: 0,
+        isEventCapture: 1,
         paddingLength: 4,
       }),
       ...left.text,
