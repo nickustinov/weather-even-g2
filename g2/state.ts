@@ -31,6 +31,10 @@ export type City = {
   country: string
   latitude: number
   longitude: number
+  // Open-Meteo geoname id. Used to re-fetch the city by ID with a different
+  // `language` param when the user switches locale — reliable across scripts.
+  // Optional: cities saved before id was tracked fall back to name search.
+  id?: number
 }
 
 export type HourlyPoint = {

@@ -237,6 +237,26 @@ export function getSavedUnit(): UnitSystem {
   return cachedUnitPrefs.temp === 'F' ? 'imperial' : 'metric'
 }
 
+type GeocodeResult = {
+  id?: number
+  name: string
+  admin1?: string
+  country?: string
+  latitude: number
+  longitude: number
+}
+
+function geocodeResultToCity(r: GeocodeResult): City {
+  return {
+    id: r.id,
+    name: r.name,
+    admin1: r.admin1 ?? '',
+    country: r.country ?? '',
+    latitude: r.latitude,
+    longitude: r.longitude,
+  }
+}
+
 export async function searchCities(query: string): Promise<City[]> {
   if (query.length < 2) return []
 
@@ -245,17 +265,20 @@ export async function searchCities(query: string): Promise<City[]> {
   const res = await fetch(url)
   if (!res.ok) return []
 
-  const data = (await res.json()) as {
-    results?: Array<{ name: string; admin1?: string; country?: string; latitude: number; longitude: number }>
-  }
+  const data = (await res.json()) as { results?: GeocodeResult[] }
+  return (data.results ?? []).map(geocodeResultToCity)
+}
 
-  return (data.results ?? []).map((r) => ({
-    name: r.name,
-    admin1: r.admin1 ?? '',
-    country: r.country ?? '',
-    latitude: r.latitude,
-    longitude: r.longitude,
-  }))
+// Look up a city by its Open-Meteo geoname ID. Used by the locale-switch
+// flow to fetch the same place's name in the new language without trusting
+// fuzzy name search to round-trip across scripts.
+async function fetchCityById(id: number, lang: Locale): Promise<City | null> {
+  const url = `https://geocoding-api.open-meteo.com/v1/get?id=${id}&language=${lang}`
+  const res = await fetch(url)
+  if (!res.ok) return null
+  const data = (await res.json()) as GeocodeResult
+  if (!data || typeof data.latitude !== 'number') return null
+  return geocodeResultToCity(data)
 }
 
 // Locale management. Persists to localStorage, fires listeners, and refetches
@@ -280,16 +303,30 @@ export async function setActiveLocale(locale: Locale): Promise<void> {
 }
 
 // Re-resolve each saved city through the geocoder so its name/admin1/country
-// switch to the active locale. Matches by coordinate (4-decimal rounding) so
-// rename quirks don't cause a miss. Cities that fail to resolve keep their
-// previous name.
+// switch to the active locale. Prefers Open-Meteo's get-by-id endpoint which
+// reliably round-trips across scripts; falls back to name search + coord
+// match for legacy cities saved before id was tracked. Keeps the previous
+// City record on any failure so the list never loses entries.
 async function relocalizeSavedCities(): Promise<void> {
   if (cachedCities.length === 0) return
+  const lang = getLocale()
   const next: City[] = []
   for (const city of cachedCities) {
-    const results = await searchCities(city.name)
-    const match = results.find(r => cityKey(r) === cityKey(city))
-    next.push(match ?? city)
+    let resolved: City | null = null
+    if (typeof city.id === 'number') {
+      resolved = await fetchCityById(city.id, lang).catch(() => null)
+    }
+    if (!resolved) {
+      const results = await searchCities(city.name).catch(() => [])
+      resolved = results.find(r => cityKey(r) === cityKey(city)) ?? null
+    }
+    // Preserve the existing id when the fallback path resolves without one
+    // (search hit by name) — otherwise a future locale switch would lose
+    // the get-by-id fast path again.
+    if (resolved && resolved.id === undefined && city.id !== undefined) {
+      resolved.id = city.id
+    }
+    next.push(resolved ?? city)
   }
   cachedCities = next
   await persistCities()
