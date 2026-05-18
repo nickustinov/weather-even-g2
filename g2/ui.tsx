@@ -711,6 +711,8 @@ function SettingsPanel() {
       <ScreensEditor />
 
       <AboutCard />
+
+      <BuyMeCoffeeButton />
     </div>
   )
 }
