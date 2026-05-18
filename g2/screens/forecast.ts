@@ -32,10 +32,10 @@ const FORECAST_STRIP2_ROWS = FORECAST_DAYS - FORECAST_STRIP1_ROWS
 const FORECAST_STRIP2_Y = FORECAST_STRIP1_Y + FORECAST_STRIP1_H
 const FORECAST_STRIP2_H = FORECAST_ROW_H * FORECAST_STRIP2_ROWS
 
-// Row layout: day | icon | low | range bar | high. Each text section is its
-// OWN text container at a fixed x — concatenating them into one row would
-// let the proportional-font width of "9°" vs "10°" shift the bar's start x
-// from row to row.
+// Row layout: day | icon | cond | low | range bar | high | precip%. Each
+// text section is its OWN text container at a fixed x — concatenating them
+// into one row would let the proportional-font width of "9°" vs "10°" shift
+// the bar's start x from row to row.
 const FORECAST_X_GUTTER = 8
 const DAY_COL_X = FORECAST_X_GUTTER
 const DAY_COL_W = 76
@@ -46,22 +46,16 @@ const FORECAST_ICON_X = DAY_COL_X + DAY_COL_W + 10
 const COND_COL_X = FORECAST_ICON_X + FORECAST_ICON_STRIP_W + 8
 const COND_COL_W = 132
 const LO_COL_X = COND_COL_X + COND_COL_W + 10
-const LO_COL_W = 52                        // worst case "-12°" / "100°"
-// Bars sit closer to the LO column unless we have 4-char low temps
-// ("-12°" / "100°+"). 3-char "10°" / "11°" stay tight — they're visually
-// narrow even though the digit count went up.
-const BARS_COL_GAP_TIGHT = -16
-const BARS_COL_GAP_WIDE = 4
-// Bars width: 10 chars × 20px = 200 (20% narrower than the previous 13).
-const FORECAST_BAR_CHARS = 10
+const LO_COL_W = 48                        // worst case "-12°" / "100°"
+// 6-cell bars. HI and PCT are fixed-width and pinned to the right edge of
+// the canvas (PCT_COL_X anchors against DISPLAY_WIDTH); BARS_COL_X is then
+// computed leftward from HI so the bars consume the remaining row budget.
+const FORECAST_BAR_CHARS = 6
 const BARS_COL_W = FORECAST_BAR_CHARS * 20 + 8
-
-function anyLowTempNeedsWideGap(w: WeatherData): boolean {
-  for (const d of w.daily.slice(0, FORECAST_DAYS)) {
-    if (d.tempMin <= -10 || d.tempMin >= 100) return true
-  }
-  return false
-}
+const HI_COL_W = 48
+// PCT column sized for worst-case "100%" (≈ 51px firmware font) +
+// paddingLength=4 on each side, then anchored to the right canvas edge.
+const PCT_COL_W = 60
 
 // DAY_COL_W (76px) fits ~5 firmware-font chars. If a locale's "today_day"
 // translation is wider than the column it would wrap; fall back to the
@@ -84,6 +78,10 @@ function forecastLowTemps(w: WeatherData): string {
 
 function forecastHighTemps(w: WeatherData): string {
   return w.daily.slice(0, FORECAST_DAYS).map(d => `${d.tempMax}°`).join('\n')
+}
+
+function forecastPrecipPcts(w: WeatherData): string {
+  return w.daily.slice(0, FORECAST_DAYS).map(d => `${d.precipProb}%`).join('\n')
 }
 
 function rangeBarChars(low: number, high: number, weekMin: number, weekMax: number, width: number): string {
@@ -127,13 +125,14 @@ export async function showForecastScreen(w: WeatherData): Promise<void> {
   const strip2Days = days.slice(FORECAST_STRIP1_ROWS)
   const weekMin = Math.min(...days.map(d => d.tempMin))
   const weekMax = Math.max(...days.map(d => d.tempMax))
-  const barsGap = anyLowTempNeedsWideGap(w) ? BARS_COL_GAP_WIDE : BARS_COL_GAP_TIGHT
-  const BARS_COL_X = LO_COL_X + LO_COL_W + barsGap
-  const HI_COL_X = BARS_COL_X + BARS_COL_W + 4
-  const HI_COL_W = DISPLAY_WIDTH - HI_COL_X - FORECAST_X_GUTTER
+  // Right-to-left placement: PCT pinned to the canvas edge, HI to its left,
+  // bars consume the remaining width between LO and HI.
+  const PCT_COL_X = DISPLAY_WIDTH - PCT_COL_W - FORECAST_X_GUTTER
+  const HI_COL_X = PCT_COL_X - HI_COL_W - 4
+  const BARS_COL_X = HI_COL_X - BARS_COL_W - 4
 
   await rebuildPage({
-    containerTotalNum: 7,
+    containerTotalNum: 8,
     textObject: [
       new TextContainerProperty({
         containerID: 1,
@@ -186,6 +185,17 @@ export async function showForecastScreen(w: WeatherData): Promise<void> {
         xPosition: HI_COL_X,
         yPosition: FORECAST_BODY_Y,
         width: HI_COL_W,
+        height: FORECAST_BODY_H,
+        isEventCapture: 0,
+        paddingLength: FORECAST_COL_PAD,
+      }),
+      new TextContainerProperty({
+        containerID: 8,
+        containerName: 'pct',
+        content: forecastPrecipPcts(w),
+        xPosition: PCT_COL_X,
+        yPosition: FORECAST_BODY_Y,
+        width: PCT_COL_W,
         height: FORECAST_BODY_H,
         isEventCapture: 0,
         paddingLength: FORECAST_COL_PAD,
