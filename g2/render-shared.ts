@@ -13,6 +13,7 @@ import {
 } from '@evenrealities/even_hub_sdk'
 import { appendEventLog } from '../_shared/log'
 import { getPrecipUnit, getPressureUnit, getTimeUnit, getWindUnit } from './api'
+import { t, tArr } from './i18n'
 import { canvasToBytes } from './icons'
 import { state, getBridge } from './state'
 import { drawWeatherIcon } from './weather-icons'
@@ -104,35 +105,31 @@ export function renderDottedNumberBytes(text: string, w: number, h: number, fixe
 // ---------------------------------------------------------------------------
 
 export function wmoShort(code: number): string {
-  if (code === 0) return 'clear'
-  if (code === 1) return 'mostly clear'
-  if (code === 2) return 'partly cloudy'
-  if (code === 3) return 'overcast'
-  if (code === 45 || code === 48) return 'foggy'
-  if (code >= 51 && code <= 57) return 'drizzle'
-  if (code >= 61 && code <= 67) return 'rain'
-  if (code >= 71 && code <= 77) return 'snow'
-  if (code >= 80 && code <= 82) return 'showers'
-  if (code >= 85 && code <= 86) return 'snow showers'
-  if (code === 95) return 'thunderstorm'
-  if (code >= 96) return 'hail storm'
+  if (code === 0) return t('wmo_short.clear')
+  if (code === 1) return t('wmo_short.mostly_clear')
+  if (code === 2) return t('wmo_short.partly_cloudy')
+  if (code === 3) return t('wmo_short.overcast')
+  if (code === 45 || code === 48) return t('wmo_short.foggy')
+  if (code >= 51 && code <= 57) return t('wmo_short.drizzle')
+  if (code >= 61 && code <= 67) return t('wmo_short.rain')
+  if (code >= 71 && code <= 77) return t('wmo_short.snow')
+  if (code >= 80 && code <= 82) return t('wmo_short.showers')
+  if (code >= 85 && code <= 86) return t('wmo_short.snow_showers')
+  if (code === 95) return t('wmo_short.thunderstorm')
+  if (code >= 96) return t('wmo_short.hail_storm')
   return ''
 }
 
 export function windLabel(deg: number): string {
-  const d = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw']
-  return d[Math.round(deg / 45) % 8]
+  return tArr('wind_dir')[Math.round(deg / 45) % 8]
 }
 
 export function speedUnit(): string {
-  const u = getWindUnit()
-  if (u === 'mph') return 'mph'
-  if (u === 'ms') return 'm/s'
-  return 'km/h'
+  return t(`unit_value.${getWindUnit()}`)
 }
 
 export function precipUnit(): string {
-  return getPrecipUnit()
+  return t(`unit_value.${getPrecipUnit()}`)
 }
 
 // Open-Meteo returns surface pressure in hPa; convert to the user's chosen
@@ -140,9 +137,10 @@ export function precipUnit(): string {
 // mercury = hPa × 0.75006.
 export function formatPressure(hPa: number): string {
   const u = getPressureUnit()
-  if (u === 'inHg') return `${(hPa * 0.02953).toFixed(2)} inHg`
-  if (u === 'mmHg') return `${Math.round(hPa * 0.75006)} mmHg`
-  return `${hPa} hPa`
+  const label = t(`unit_value.${u}`)
+  if (u === 'inHg') return `${(hPa * 0.02953).toFixed(2)} ${label}`
+  if (u === 'mmHg') return `${Math.round(hPa * 0.75006)} ${label}`
+  return `${hPa} ${label}`
 }
 
 // Just the numeric portion in the user's chosen unit — used where the
@@ -158,18 +156,15 @@ export function formatPressureValue(hPa: number): string {
 }
 
 export function pressureUnitLabel(): string {
-  return getPressureUnit()
+  return t(`unit_value.${getPressureUnit()}`)
 }
 
 // ---------------------------------------------------------------------------
 // Date / time helpers
 // ---------------------------------------------------------------------------
 
-export const DAYS_SHORT = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-export const MONTHS_SHORT = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
-
 export function todayDateString(d: Date = new Date()): string {
-  return `${DAYS_SHORT[d.getDay()]} ${d.getDate()}`
+  return `${tArr('days_short')[d.getDay()]} ${d.getDate()}`
 }
 
 export function timeToMinutes(hhmm: string): number {
@@ -184,7 +179,7 @@ function to12h(hhmm: string): string {
   const [hStr, mStr] = hhmm.split(':')
   const h = Number(hStr)
   if (!Number.isFinite(h)) return hhmm
-  const suffix = h >= 12 ? 'pm' : 'am'
+  const suffix = h >= 12 ? t('pm') : t('am')
   const h12 = h % 12 === 0 ? 12 : h % 12
   return `${h12}:${mStr} ${suffix}`
 }
@@ -193,7 +188,7 @@ function to12hCompact(hhmm: string): string {
   const [hStr, mStr] = hhmm.split(':')
   const h = Number(hStr)
   if (!Number.isFinite(h)) return hhmm
-  const suffix = h >= 12 ? 'pm' : 'am'
+  const suffix = h >= 12 ? t('pm') : t('am')
   const h12 = h % 12 === 0 ? 12 : h % 12
   // No space — "12 pm" overflows the 52px inner times column, "12pm" fits.
   // Open-Meteo hourly readings are always on the hour, so we drop ":00".
@@ -212,8 +207,8 @@ export function displayTime(hhmm: string, compact = false): string {
 export function formatHm(mins: number): string {
   const h = Math.floor(mins / 60)
   const m = mins % 60
-  if (h === 0) return `${m}m`
-  return `${h}h ${m}m`
+  if (h === 0) return t('glasses.minutes', { m })
+  return t('glasses.hours_minutes', { h, m })
 }
 
 export function dayProgress(sunrise: string, sunset: string): number {
@@ -233,7 +228,7 @@ export function daylightRemaining(sunrise: string, sunset: string): string {
   const sunMin = timeToMinutes(sunrise)
   const setMin = timeToMinutes(sunset)
   if (nowMin < sunMin) return formatHm(setMin - sunMin)
-  if (nowMin >= setMin) return '0m'
+  if (nowMin >= setMin) return formatHm(0)
   return formatHm(setMin - nowMin)
 }
 

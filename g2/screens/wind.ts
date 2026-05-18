@@ -3,6 +3,7 @@ import {
   TextContainerProperty,
 } from '@evenrealities/even_hub_sdk'
 import { appendEventLog } from '../../_shared/log'
+import { t } from '../i18n'
 import { DISPLAY_WIDTH } from '../layout'
 import { state } from '../state'
 import type { WeatherData } from '../state'
@@ -75,7 +76,7 @@ export async function showWindScreen(w: WeatherData): Promise<void> {
       new TextContainerProperty({
         containerID: 1,
         containerName: 'header',
-        content: `${w.city.toLowerCase()}  ·  ${w.currentTemp}°  ·  ${todayDateString()}  ·  wind gusts ${w.windGust} ${speedUnit()}`,
+        content: `${w.city.toLowerCase()}  ·  ${w.currentTemp}°  ·  ${todayDateString()}  ·  ${t('glasses.wind_gusts', { value: w.windGust, unit: speedUnit() })}`,
         xPosition: CHART_PAD,
         yPosition: 2,
         width: DISPLAY_WIDTH - CHART_PAD * 2,
@@ -119,7 +120,7 @@ export async function showWindScreen(w: WeatherData): Promise<void> {
       new TextContainerProperty({
         containerID: 5,
         containerName: 'windlabel',
-        content: 'wind',
+        content: t('glasses.label_wind'),
         xPosition: CHART_TOTAL_X,
         yPosition: CHART_LABEL_TOP_Y,
         width: CHART_TOTAL_W,

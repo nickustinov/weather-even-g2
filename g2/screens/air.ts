@@ -10,7 +10,9 @@ import {
   hasPollenData,
   pollenCategory,
   pollenScaleMax,
+  pollenSpeciesLabel,
 } from '../api'
+import { t } from '../i18n'
 import { state } from '../state'
 import type { AirQuality, Pollen, WeatherData } from '../state'
 import {
@@ -59,7 +61,7 @@ function pollenRows(p: Pollen): Row[] {
   for (const s of species) {
     const v = p[s]
     if (v === null) continue
-    rows.push({ label: s, value: v, scaleMax: pollenScaleMax(s), suffix: '' })
+    rows.push({ label: pollenSpeciesLabel(s), value: v, scaleMax: pollenScaleMax(s), suffix: '' })
   }
   return rows
 }
@@ -109,7 +111,7 @@ export async function showAirScreen(w: WeatherData): Promise<void> {
         new TextContainerProperty({
           containerID: 1,
           containerName: 'unavailable',
-          content: 'air quality data unavailable',
+          content: t('glasses.air_unavailable'),
           xPosition: CHART_PAD,
           yPosition: CHART_BODY_Y + 40,
           width: DISPLAY_WIDTH - CHART_PAD * 2,
@@ -131,7 +133,7 @@ export async function showAirScreen(w: WeatherData): Promise<void> {
   // else fall back to the AQI category.
   const dom = usePollen ? dominantPollen(aq.pollen) : null
   const headerExtra = dom
-    ? `${dom.species} ${pollenCategory(dom.species, dom.value)}`
+    ? `${pollenSpeciesLabel(dom.species)} ${pollenCategory(dom.species, dom.value)}`
     : aqiCategory(aq.euAqi)
 
   await rebuildPage({
@@ -184,7 +186,7 @@ export async function showAirScreen(w: WeatherData): Promise<void> {
       new TextContainerProperty({
         containerID: 5,
         containerName: 'aqilabel',
-        content: 'air quality',
+        content: t('glasses.label_air_quality'),
         xPosition: CHART_TOTAL_X,
         yPosition: CHART_LABEL_TOP_Y,
         width: CHART_TOTAL_W,
@@ -195,7 +197,7 @@ export async function showAirScreen(w: WeatherData): Promise<void> {
       new TextContainerProperty({
         containerID: 6,
         containerName: 'aqiunit',
-        content: 'eu aqi',
+        content: t('glasses.eu_aqi'),
         xPosition: CHART_TOTAL_X,
         yPosition: CHART_LABEL_BOT_Y,
         width: CHART_TOTAL_W,

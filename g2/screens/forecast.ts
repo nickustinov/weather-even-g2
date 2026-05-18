@@ -8,6 +8,7 @@ import { canvasToBytes } from '../icons'
 import { state } from '../state'
 import type { WeatherData } from '../state'
 import { drawWeatherIcon } from '../weather-icons'
+import { t } from '../i18n'
 import { rebuildPage, sendImage, wmoShort } from '../render-shared'
 
 const FORECAST_DAYS = 10
@@ -62,8 +63,15 @@ function anyLowTempNeedsWideGap(w: WeatherData): boolean {
   return false
 }
 
+// DAY_COL_W (76px) fits ~5 firmware-font chars. If a locale's "today_day"
+// translation is wider than the column it would wrap; fall back to the
+// regular weekday short form (always 2–3 chars and guaranteed to fit).
+const TODAY_DAY_MAX_CHARS = 5
+
 function forecastDays(w: WeatherData): string {
-  return w.daily.slice(0, FORECAST_DAYS).map((d, i) => i === 0 ? 'today' : d.day).join('\n')
+  const todayLabel = t('glasses.today_day')
+  const safeToday = todayLabel.length <= TODAY_DAY_MAX_CHARS ? todayLabel : w.daily[0]?.day ?? todayLabel
+  return w.daily.slice(0, FORECAST_DAYS).map((d, i) => i === 0 ? safeToday : d.day).join('\n')
 }
 
 function forecastConditions(w: WeatherData): string {

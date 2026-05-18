@@ -3,6 +3,7 @@ import {
   TextContainerProperty,
 } from '@evenrealities/even_hub_sdk'
 import { appendEventLog } from '../../_shared/log'
+import { wmoDescription } from '../api'
 import { DISPLAY_WIDTH } from '../layout'
 import { canvasToBytes } from '../icons'
 import { state } from '../state'
@@ -161,7 +162,7 @@ export async function showHoursScreen(w: WeatherData): Promise<void> {
       new TextContainerProperty({
         containerID: HEADER_ID,
         containerName: 'header',
-        content: `${w.city.toLowerCase()}  ·  ${w.currentTemp}°  ·  ${todayDateString()}  ·  ${w.currentDescription}`,
+        content: `${w.city.toLowerCase()}  ·  ${w.currentTemp}°  ·  ${todayDateString()}  ·  ${wmoDescription(w.currentWmoCode)}`,
         xPosition: 8,
         yPosition: 2,
         width: DISPLAY_WIDTH - 16,

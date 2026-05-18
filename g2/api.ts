@@ -7,6 +7,7 @@ import type {
 } from './state'
 import { DEFAULT_SCREEN_PREFS, DEFAULT_UNIT_PREFS, SCREENS, getBridge } from './state'
 import { appendEventLog } from '../_shared/log'
+import { detectBrowserLocale, getLocale, setLocaleSync, SUPPORTED_LOCALES, t, tArr, type Locale } from './i18n'
 
 const CITY_KEY = 'weather:city'        // legacy: single-city storage, migrated
 const CITIES_KEY = 'weather:cities'
@@ -14,6 +15,7 @@ const ACTIVE_KEY = 'weather:active-city'
 const UNIT_KEY = 'weather:unit'        // legacy: 'metric'|'imperial', migrated
 const UNIT_PREFS_KEY = 'weather:units'
 const SCREENS_KEY = 'weather:screens'
+const LOCALE_KEY = 'weather:locale'
 
 // --- Settings (SDK local storage + memory cache) ---
 
@@ -25,6 +27,7 @@ const settingsListeners: Array<() => void> = []
 const screenPrefsListeners: Array<() => void> = []
 const citiesListeners: Array<() => void> = []
 const unitPrefsListeners: Array<() => void> = []
+const localeListeners: Array<() => void> = []
 
 // Stable identifier for a city — coordinates uniquely identify a place
 // (two cities sharing a name distinguish themselves by lat/lng) and survive
@@ -81,6 +84,11 @@ export async function loadSettings(b: EvenAppBridge): Promise<void> {
       await b.setLocalStorage(UNIT_PREFS_KEY, JSON.stringify(cachedUnitPrefs))
     }
   }
+
+  const rawLocale = await b.getLocalStorage(LOCALE_KEY)
+  const stored = rawLocale as Locale | null
+  const initial = stored && SUPPORTED_LOCALES.includes(stored) ? stored : detectBrowserLocale()
+  setLocaleSync(initial)
 
   const rawScreens = await b.getLocalStorage(SCREENS_KEY)
   if (rawScreens) {
@@ -232,7 +240,8 @@ export function getSavedUnit(): UnitSystem {
 export async function searchCities(query: string): Promise<City[]> {
   if (query.length < 2) return []
 
-  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=5&language=en`
+  const lang = getLocale()
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=5&language=${lang}`
   const res = await fetch(url)
   if (!res.ok) return []
 
@@ -249,22 +258,57 @@ export async function searchCities(query: string): Promise<City[]> {
   }))
 }
 
-function wmoDescription(code: number): string {
-  if (code === 0) return 'clear sky'
-  if (code === 1) return 'mainly clear'
-  if (code === 2) return 'partly cloudy'
-  if (code === 3) return 'overcast'
-  if (code === 45 || code === 48) return 'foggy'
-  if (code >= 51 && code <= 57) return 'drizzle'
-  if (code >= 61 && code <= 67) return 'rain'
-  if (code >= 71 && code <= 77) return 'snow'
-  if (code >= 80 && code <= 82) return 'rain showers'
-  if (code >= 85 && code <= 86) return 'snow showers'
-  if (code >= 95) return 'thunderstorm'
-  return 'unknown'
+// Locale management. Persists to localStorage, fires listeners, and refetches
+// saved cities so their names switch to the new language.
+export function getActiveLocale(): Locale {
+  return getLocale()
 }
 
-const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+export function onLocaleChanged(cb: () => void): void {
+  localeListeners.push(cb)
+}
+
+export async function setActiveLocale(locale: Locale): Promise<void> {
+  const changed = setLocaleSync(locale)
+  if (!changed) return
+  const b = getBridge()
+  if (b) await b.setLocalStorage(LOCALE_KEY, locale)
+  await relocalizeSavedCities()
+  for (const cb of localeListeners) cb()
+  // City list also visually depends on locale (names changed).
+  for (const cb of citiesListeners) cb()
+}
+
+// Re-resolve each saved city through the geocoder so its name/admin1/country
+// switch to the active locale. Matches by coordinate (4-decimal rounding) so
+// rename quirks don't cause a miss. Cities that fail to resolve keep their
+// previous name.
+async function relocalizeSavedCities(): Promise<void> {
+  if (cachedCities.length === 0) return
+  const next: City[] = []
+  for (const city of cachedCities) {
+    const results = await searchCities(city.name)
+    const match = results.find(r => cityKey(r) === cityKey(city))
+    next.push(match ?? city)
+  }
+  cachedCities = next
+  await persistCities()
+}
+
+export function wmoDescription(code: number): string {
+  if (code === 0) return t('wmo_long.clear')
+  if (code === 1) return t('wmo_long.mainly_clear')
+  if (code === 2) return t('wmo_long.partly_cloudy')
+  if (code === 3) return t('wmo_long.overcast')
+  if (code === 45 || code === 48) return t('wmo_long.foggy')
+  if (code >= 51 && code <= 57) return t('wmo_long.drizzle')
+  if (code >= 61 && code <= 67) return t('wmo_long.rain')
+  if (code >= 71 && code <= 77) return t('wmo_long.snow')
+  if (code >= 80 && code <= 82) return t('wmo_long.rain_showers')
+  if (code >= 85 && code <= 86) return t('wmo_long.snow_showers')
+  if (code >= 95) return t('wmo_long.thunderstorm')
+  return t('wmo_long.unknown')
+}
 
 // Always returns 24h "HH:MM"; display-time formatting lives in
 // render-shared.ts (displayTime/displayTimeCompact) so internal helpers
@@ -366,8 +410,8 @@ export async function fetchWeather(city: City, prefs: UnitPrefs = DEFAULT_UNIT_P
       }
     })
 
-  const dailyPoints: DailyPoint[] = (daily.time ?? []).map((t, i) => ({
-    day: WEEKDAYS[new Date(t + 'T00:00:00').getDay()],
+  const dailyPoints: DailyPoint[] = (daily.time ?? []).map((dateStr, i) => ({
+    day: tArr('days_short')[new Date(dateStr + 'T00:00:00').getDay()],
     wmoCode: daily.weather_code?.[i] ?? 0,
     tempMax: Math.round(daily.temperature_2m_max?.[i] ?? 0),
     tempMin: Math.round(daily.temperature_2m_min?.[i] ?? 0),
@@ -392,7 +436,6 @@ export async function fetchWeather(city: City, prefs: UnitPrefs = DEFAULT_UNIT_P
     city: city.name,
     currentTemp: Math.round(current.temperature_2m ?? 0),
     currentWmoCode: current.weather_code ?? 0,
-    currentDescription: wmoDescription(current.weather_code ?? 0),
     feelsLike: Math.round(current.apparent_temperature ?? 0),
     windSpeed: Math.round(current.wind_speed_10m ?? 0),
     windGust: Math.round(current.wind_gusts_10m ?? 0),
@@ -486,10 +529,14 @@ export function pollenScaleMax(species: keyof Pollen): number {
 
 export function pollenCategory(species: keyof Pollen, value: number): string {
   const max = POLLEN_SCALES[species]
-  if (value < max * 0.1) return 'low'
-  if (value < max * 0.3) return 'moderate'
-  if (value < max) return 'high'
-  return 'very high'
+  if (value < max * 0.1) return t('pollen_category.low')
+  if (value < max * 0.3) return t('pollen_category.moderate')
+  if (value < max) return t('pollen_category.high')
+  return t('pollen_category.very_high')
+}
+
+export function pollenSpeciesLabel(species: keyof Pollen): string {
+  return t(`pollen_species.${species}`)
 }
 
 // Returns the single most elevated pollen species (as a fraction of its "very
@@ -515,40 +562,40 @@ export function hasPollenData(pollen: Pollen): boolean {
 // Human comfort vs. relative humidity %. Dew point is a better physical
 // "muggy" gauge, but most users intuit % so we lead with that.
 export function humidityComfort(rh: number): string {
-  if (rh < 30) return 'dry'
-  if (rh < 60) return 'comfortable'
-  if (rh < 70) return 'sticky'
-  if (rh < 85) return 'muggy'
-  return 'oppressive'
+  if (rh < 30) return t('humidity_comfort.dry')
+  if (rh < 60) return t('humidity_comfort.comfortable')
+  if (rh < 70) return t('humidity_comfort.sticky')
+  if (rh < 85) return t('humidity_comfort.muggy')
+  return t('humidity_comfort.oppressive')
 }
 
 // WHO UV category bands.
 export function uvCategory(uv: number): string {
-  if (uv < 3) return 'low'
-  if (uv < 6) return 'moderate'
-  if (uv < 8) return 'high'
-  if (uv < 11) return 'very high'
-  return 'extreme'
+  if (uv < 3) return t('uv_category.low')
+  if (uv < 6) return t('uv_category.moderate')
+  if (uv < 8) return t('uv_category.high')
+  if (uv < 11) return t('uv_category.very_high')
+  return t('uv_category.extreme')
 }
 
 // Short form for tight columns — keep ≤4 chars so the value+category fits in
 // the chart's values column.
 export function uvCategoryShort(uv: number): string {
-  if (uv < 3) return 'low'
-  if (uv < 6) return 'mod'
-  if (uv < 8) return 'high'
-  if (uv < 11) return 'v.hi'
-  return 'extr'
+  if (uv < 3) return t('uv_category_short.low')
+  if (uv < 6) return t('uv_category_short.moderate')
+  if (uv < 8) return t('uv_category_short.high')
+  if (uv < 11) return t('uv_category_short.very_high')
+  return t('uv_category_short.extreme')
 }
 
 // EU air-quality index categories (0–100+ scale).
 export function aqiCategory(aqi: number): string {
-  if (aqi < 20) return 'good'
-  if (aqi < 40) return 'fair'
-  if (aqi < 60) return 'moderate'
-  if (aqi < 80) return 'poor'
-  if (aqi < 100) return 'very poor'
-  return 'extremely poor'
+  if (aqi < 20) return t('aqi_category.good')
+  if (aqi < 40) return t('aqi_category.fair')
+  if (aqi < 60) return t('aqi_category.moderate')
+  if (aqi < 80) return t('aqi_category.poor')
+  if (aqi < 100) return t('aqi_category.very_poor')
+  return t('aqi_category.extremely_poor')
 }
 
 // URL query overrides for visual testing of edge cases without touching code.
@@ -601,11 +648,10 @@ function applyTestOverrides(w: WeatherData): WeatherData {
   if (todayLo !== undefined && w.daily[0]) w.daily[0].tempMin = Math.round(todayLo)
   // wmo overrides the current WMO weather code so we can preview each
   // condition icon (0=clear, 2=partly cloudy, 3=overcast, 45=fog, 61=rain,
-  // 71=snow, 95=thunderstorm, etc.). Description updates to match.
+  // 71=snow, 95=thunderstorm, etc.).
   const wmo = num('wmo')
   if (wmo !== undefined) {
     w.currentWmoCode = Math.round(wmo)
-    w.currentDescription = wmoDescription(w.currentWmoCode)
   }
   // Air quality overrides: aqi sets the headline; pm25/pm10/no2/o3/so2/co
   // populate individual pollutant bars. Synthesises an airQuality object if

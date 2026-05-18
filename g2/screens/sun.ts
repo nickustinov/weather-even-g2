@@ -3,9 +3,10 @@ import {
   TextContainerProperty,
 } from '@evenrealities/even_hub_sdk'
 import { appendEventLog } from '../../_shared/log'
+import { getSavedCity, wmoDescription } from '../api'
+import { t } from '../i18n'
 import { DISPLAY_WIDTH } from '../layout'
 import { canvasToBytes } from '../icons'
-import { getSavedCity } from '../api'
 import {
   daysToPhase,
   drawMoon,
@@ -64,7 +65,7 @@ const MOON_STATS_VALUE_X = MOON_STATS_LABEL_X + MOON_STATS_LABEL_W
 const MOON_STATS_VALUE_W = DISPLAY_WIDTH - MOON_STATS_VALUE_X - 8
 
 function sunLabels(): string {
-  return ['sunrise', 'sunset'].join('\n')
+  return [t('glasses.sunrise'), t('glasses.sunset')].join('\n')
 }
 
 function sunValues(w: WeatherData): string {
@@ -85,7 +86,10 @@ function sunProgressLine(w: WeatherData): string {
 
 function dayLengthString(w: WeatherData): string {
   const length = timeToMinutes(w.sunset) - timeToMinutes(w.sunrise)
-  return `${formatHm(length)} day  ·  ${daylightRemaining(w.sunrise, w.sunset)} left`
+  return t('glasses.day_length', {
+    length: formatHm(length),
+    remaining: daylightRemaining(w.sunrise, w.sunset),
+  })
 }
 
 async function renderMoonImage(phase: number): Promise<number[]> {
@@ -107,13 +111,18 @@ export async function showSunScreen(w: WeatherData): Promise<void> {
   const distance = city ? moonDistanceKm(now, city.latitude, city.longitude) : null
   const daysToFull = daysToPhase(0.5, moon.phase)
 
-  const moonHeadText = `${moon.name}\n${moon.illumination}% illuminated`
-  const statsLabels = ['moonrise', 'moonset', 'full in', 'distance'].join('\n')
+  const moonHeadText = `${moon.name}\n${t('glasses.illuminated', { pct: moon.illumination })}`
+  const statsLabels = [
+    t('glasses.moonrise'),
+    t('glasses.moonset'),
+    t('glasses.full_in'),
+    t('glasses.distance'),
+  ].join('\n')
   const statsValues = [
     displayTime(formatHHMM(times.rise)),
     displayTime(formatHHMM(times.set)),
-    `${daysToFull} d`,
-    distance !== null ? `${distance.toLocaleString()} km` : '–',
+    `${daysToFull} ${t('glasses.unit_d')}`,
+    distance !== null ? `${distance.toLocaleString()} ${t('glasses.unit_km')}` : '–',
   ].join('\n')
 
   await rebuildPage({
@@ -122,7 +131,7 @@ export async function showSunScreen(w: WeatherData): Promise<void> {
       new TextContainerProperty({
         containerID: 1,
         containerName: 'header',
-        content: `${w.city.toLowerCase()}  ·  ${w.currentTemp}°  ·  ${todayDateString()}  ·  ${w.currentDescription}`,
+        content: `${w.city.toLowerCase()}  ·  ${w.currentTemp}°  ·  ${todayDateString()}  ·  ${wmoDescription(w.currentWmoCode)}`,
         xPosition: CHART_PAD,
         yPosition: 2,
         width: DISPLAY_WIDTH - CHART_PAD * 2,

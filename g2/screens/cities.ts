@@ -5,18 +5,17 @@ import {
 import { appendEventLog } from '../../_shared/log'
 import { DISPLAY_WIDTH, DISPLAY_HEIGHT } from '../layout'
 import { cityKey, getActiveCity, getCities } from '../api'
+import { t } from '../i18n'
 import { state } from '../state'
 import { rebuildPage } from '../render-shared'
 
 // Full-screen city picker modal. Tap on any weather screen opens this list;
-// the user picks a city or scrolls to the first item ("‹ Back") to dismiss.
-
-const BACK_LABEL = '‹ Back'
+// the user picks a city or scrolls to the first item ("back") to dismiss.
 
 export function buildCityPickerLabels(): string[] {
   const cities = getCities()
   const active = getActiveCity()
-  const labels: string[] = [BACK_LABEL]
+  const labels: string[] = [t('glasses.back')]
   for (const c of cities) {
     const isActive = active && cityKey(c) === cityKey(active)
     const name = c.name + (c.admin1 ? `, ${c.admin1}` : '') + (c.country ? `, ${c.country}` : '')

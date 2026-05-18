@@ -5,6 +5,7 @@ import {
 import { appendEventLog } from '../../_shared/log'
 import { DISPLAY_WIDTH } from '../layout'
 import { uvCategory, uvCategoryShort } from '../api'
+import { t } from '../i18n'
 import { state } from '../state'
 import type { HourlyPoint, WeatherData } from '../state'
 import {
@@ -74,8 +75,8 @@ function protectionWindow(w: WeatherData): string {
   if (protectHours.length === 0) return uvCategory(w.hourly[0]?.uvIndex ?? 0)
   const first = displayTime(protectHours[0].time)
   const last = displayTime(protectHours[protectHours.length - 1].time)
-  if (first === last) return `protect at ${first}`
-  return `protect ${first}–${last}`
+  if (first === last) return t('glasses.protect_at', { time: first })
+  return t('glasses.protect_range', { from: first, to: last })
 }
 
 export async function showUvScreen(w: WeatherData): Promise<void> {
@@ -132,7 +133,7 @@ export async function showUvScreen(w: WeatherData): Promise<void> {
       new TextContainerProperty({
         containerID: 5,
         containerName: 'uvlabel',
-        content: 'uv index',
+        content: t('glasses.label_uv_index'),
         xPosition: CHART_TOTAL_X,
         yPosition: CHART_LABEL_TOP_Y,
         width: CHART_TOTAL_W,

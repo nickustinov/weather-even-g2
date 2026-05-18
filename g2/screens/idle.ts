@@ -1,4 +1,5 @@
 import { ImageContainerProperty, TextContainerProperty } from '@evenrealities/even_hub_sdk'
+import { t } from '../i18n'
 import { DISPLAY_WIDTH } from '../layout'
 import { canvasToBytes } from '../icons'
 import { drawWeatherIcon } from '../weather-icons'
@@ -10,7 +11,6 @@ const SETUP_ICON_SIZE = 88
 // estimated from firmware char widths (~10px each, 30 chars ≈ 300px).
 const SETUP_TEXT_W = 360
 const SETUP_TEXT_H = 40
-const SETUP_TEXT_TEXT = 'choose a city in the phone app'
 
 export async function showSetupMessage(): Promise<void> {
   const iconX = Math.floor((DISPLAY_WIDTH - SETUP_ICON_SIZE) / 2)
@@ -24,7 +24,7 @@ export async function showSetupMessage(): Promise<void> {
       new TextContainerProperty({
         containerID: 1,
         containerName: 'setupMsg',
-        content: SETUP_TEXT_TEXT,
+        content: t('glasses.setup_msg'),
         xPosition: textX,
         yPosition: textY,
         width: SETUP_TEXT_W,

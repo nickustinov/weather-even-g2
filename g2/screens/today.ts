@@ -3,6 +3,8 @@ import {
   TextContainerProperty,
 } from '@evenrealities/even_hub_sdk'
 import { appendEventLog } from '../../_shared/log'
+import { wmoDescription } from '../api'
+import { t } from '../i18n'
 import { DISPLAY_WIDTH, DISPLAY_HEIGHT } from '../layout'
 import { state } from '../state'
 import type { WeatherData } from '../state'
@@ -78,17 +80,25 @@ function todayDegreePosition(temp: number): { x: number; y: number } {
 }
 
 function todayHeader(w: WeatherData): string {
-  return `${w.city.toLowerCase()}  ·  ${todayDateString()}  ·  ${w.currentDescription.toLowerCase()}`
+  return `${w.city.toLowerCase()}  ·  ${todayDateString()}  ·  ${wmoDescription(w.currentWmoCode).toLowerCase()}`
 }
 
 function todayRangeAndDaylight(today: WeatherData['daily'][number], w: WeatherData): string {
   const range = `↑ ${today.tempMax}°    ↓ ${today.tempMin}°`
-  const daylight = `${daylightRemaining(w.sunrise, w.sunset)} daylight left`
+  const daylight = t('glasses.daylight_left', { value: daylightRemaining(w.sunrise, w.sunset) })
   return `${range}\n${daylight}`
 }
 
 function todayStatLabels(): string {
-  return ['feels', 'wind', 'humid', 'press', 'rise', 'set', 'uv'].join('\n')
+  return [
+    t('glasses.stat_feels'),
+    t('glasses.stat_wind'),
+    t('glasses.stat_humid'),
+    t('glasses.stat_press'),
+    t('glasses.stat_rise'),
+    t('glasses.stat_set'),
+    t('glasses.stat_uv'),
+  ].join('\n')
 }
 
 function todayStatValues(w: WeatherData, today: WeatherData['daily'][number]): string {

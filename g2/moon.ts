@@ -4,6 +4,7 @@
 // because those depend on observer lat/lon and proper orbital mechanics.
 
 import SunCalc from 'suncalc'
+import { t } from './i18n'
 
 const SYNODIC_PERIOD_DAYS = 29.530588853
 // Known new moon: 2000-01-06 18:14 UTC.
@@ -25,14 +26,14 @@ export function moonPhase(date: Date = new Date()): MoonPhaseInfo {
   const phase = ((raw % 1) + 1) % 1
 
   let name: string
-  if (phase < 0.02 || phase >= 0.98) name = 'new moon'
-  else if (phase < 0.23) name = 'waxing crescent'
-  else if (phase < 0.27) name = 'first quarter'
-  else if (phase < 0.48) name = 'waxing gibbous'
-  else if (phase < 0.52) name = 'full moon'
-  else if (phase < 0.73) name = 'waning gibbous'
-  else if (phase < 0.77) name = 'last quarter'
-  else name = 'waning crescent'
+  if (phase < 0.02 || phase >= 0.98) name = t('moon_phase.new')
+  else if (phase < 0.23) name = t('moon_phase.waxing_crescent')
+  else if (phase < 0.27) name = t('moon_phase.first_quarter')
+  else if (phase < 0.48) name = t('moon_phase.waxing_gibbous')
+  else if (phase < 0.52) name = t('moon_phase.full')
+  else if (phase < 0.73) name = t('moon_phase.waning_gibbous')
+  else if (phase < 0.77) name = t('moon_phase.last_quarter')
+  else name = t('moon_phase.waning_crescent')
 
   const illumination = Math.round((1 - Math.cos(phase * 2 * Math.PI)) / 2 * 100)
   return { phase, name, illumination }

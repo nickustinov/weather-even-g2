@@ -9,7 +9,10 @@ import { preloadWeatherIcons } from './weather-icons'
 export async function refreshWeather(): Promise<void> {
   const city = getSavedCity()
   if (!city) {
-    appendEventLog('Weather: no city configured')
+    // Redraw the setup message — locale/state may have changed since the
+    // last paint, so always repaint rather than returning early.
+    appendEventLog('Weather: no city configured, showing setup')
+    await showSetupMessage()
     return
   }
 

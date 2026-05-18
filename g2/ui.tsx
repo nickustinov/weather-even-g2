@@ -2,14 +2,16 @@ import React, { useState, useRef, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { SegmentedControl } from 'even-toolkit/web/segmented-control'
 import { SearchBar } from 'even-toolkit/web/search-bar'
+import { Select } from 'even-toolkit/web/select'
 import {
   searchCities, onSettingsLoaded,
   getCities, getActiveCity, cityKey, addCity, removeCity, setActiveCity, setCities, onCitiesChanged,
   getScreenPrefs, saveScreenPrefs, onScreenPrefsChanged,
   getUnitPrefs, setUnitPrefs, onUnitPrefsChanged,
+  getActiveLocale, setActiveLocale, onLocaleChanged,
 } from './api'
 import { refreshWeather } from './app'
-import { SCREEN_LABELS } from './state'
+import { LOCALE_LABELS, SUPPORTED_LOCALES, t, type Locale } from './i18n'
 import type { City, ScreenPref, UnitPrefs } from './state'
 
 function autoConnect() {
@@ -227,7 +229,7 @@ function CitiesEditor() {
                     setTargetIndex(null)
                     setDragOffsetY(0)
                   }}
-                  aria-label={`Drag ${cityLabel(city)}`}
+                  aria-label={t('browser.drag_city', { city: cityLabel(city) })}
                   style={{
                     color: 'var(--color-text-dim)',
                     fontSize: 18,
@@ -252,7 +254,7 @@ function CitiesEditor() {
                 </span>
                 <button
                   onClick={() => handleRemove(city)}
-                  aria-label={`Remove ${cityLabel(city)}`}
+                  aria-label={t('browser.remove_city', { city: cityLabel(city) })}
                   style={iconBtnStyle}
                 >
                   ×
@@ -267,7 +269,7 @@ function CitiesEditor() {
         id="city-search"
         value={query}
         onChange={handleSearchChange}
-        placeholder={cities.length === 0 ? 'Search city...' : 'Add another city...'}
+        placeholder={cities.length === 0 ? t('browser.search_first') : t('browser.search_more')}
         autoComplete="off"
         autoCorrect="off"
         autoCapitalize="off"
@@ -292,28 +294,7 @@ function CitiesEditor() {
   )
 }
 
-const TEMP_OPTIONS = [
-  { value: 'C', label: '°C' },
-  { value: 'F', label: '°F' },
-]
-const WIND_OPTIONS = [
-  { value: 'kmh', label: 'km/h' },
-  { value: 'mph', label: 'mph' },
-  { value: 'ms', label: 'm/s' },
-]
-const PRECIP_OPTIONS = [
-  { value: 'mm', label: 'mm' },
-  { value: 'in', label: 'in' },
-]
-const PRESSURE_OPTIONS = [
-  { value: 'hPa', label: 'hPa' },
-  { value: 'inHg', label: 'inHg' },
-  { value: 'mmHg', label: 'mmHg' },
-]
-const TIME_OPTIONS = [
-  { value: '24h', label: '24h' },
-  { value: '12h', label: '12h' },
-]
+const unitOpt = (v: string) => ({ value: v, label: t(`unit_value.${v}`) })
 
 function UnitRow({
   label,
@@ -326,10 +307,17 @@ function UnitRow({
   value: string
   onChange: (v: string) => void
 }) {
+  // flexShrink:0 wrapper keeps the toolkit SegmentedControl at its natural
+  // content width — its inner buttons are `flex-1` and will collapse below
+  // their text when the parent row squeezes them. whitespace-nowrap on the
+  // control prevents per-button text wrapping for longer localized labels
+  // (e.g. "км/ч", "мм рт").
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '8px 0' }}>
-      <span className="text-medium-body" style={{ color: 'var(--color-text)' }}>{label}</span>
-      <SegmentedControl options={options} value={value} onValueChange={onChange} size="small" />
+      <span className="text-medium-body" style={{ color: 'var(--color-text)', minWidth: 0 }}>{label}</span>
+      <div style={{ flexShrink: 0 }}>
+        <SegmentedControl options={options} value={value} onValueChange={onChange} size="small" className="whitespace-nowrap" />
+      </div>
     </div>
   )
 }
@@ -348,13 +336,21 @@ function UnitPicker() {
     void refreshWeather()
   }
 
+  // Rebuild option arrays on every render so unit labels stay in sync with
+  // the active locale (SettingsPanel re-renders the picker via useLocaleTick).
+  const tempOpts = ['C', 'F'].map(unitOpt)
+  const windOpts = ['kmh', 'mph', 'ms'].map(unitOpt)
+  const precipOpts = ['mm', 'in'].map(unitOpt)
+  const pressureOpts = ['hPa', 'inHg', 'mmHg'].map(unitOpt)
+  const timeOpts = ['24h', '12h'].map(unitOpt)
+
   return (
     <div className="weather-card">
-      <UnitRow label="Temperature" options={TEMP_OPTIONS} value={prefs.temp} onChange={(v) => void update({ temp: v as UnitPrefs['temp'] })} />
-      <UnitRow label="Wind speed" options={WIND_OPTIONS} value={prefs.wind} onChange={(v) => void update({ wind: v as UnitPrefs['wind'] })} />
-      <UnitRow label="Precipitation" options={PRECIP_OPTIONS} value={prefs.precip} onChange={(v) => void update({ precip: v as UnitPrefs['precip'] })} />
-      <UnitRow label="Pressure" options={PRESSURE_OPTIONS} value={prefs.pressure} onChange={(v) => void update({ pressure: v as UnitPrefs['pressure'] })} />
-      <UnitRow label="Time" options={TIME_OPTIONS} value={prefs.time} onChange={(v) => void update({ time: v as UnitPrefs['time'] })} />
+      <UnitRow label={t('browser.temperature')} options={tempOpts} value={prefs.temp} onChange={(v) => void update({ temp: v as UnitPrefs['temp'] })} />
+      <UnitRow label={t('browser.wind_speed')} options={windOpts} value={prefs.wind} onChange={(v) => void update({ wind: v as UnitPrefs['wind'] })} />
+      <UnitRow label={t('browser.precipitation')} options={precipOpts} value={prefs.precip} onChange={(v) => void update({ precip: v as UnitPrefs['precip'] })} />
+      <UnitRow label={t('browser.pressure')} options={pressureOpts} value={prefs.pressure} onChange={(v) => void update({ pressure: v as UnitPrefs['pressure'] })} />
+      <UnitRow label={t('browser.time')} options={timeOpts} value={prefs.time} onChange={(v) => void update({ time: v as UnitPrefs['time'] })} />
     </div>
   )
 }
@@ -529,7 +525,7 @@ function ScreensEditor() {
                   setTargetIndex(null)
                   setDragOffsetY(0)
                 }}
-                aria-label={`Drag ${SCREEN_LABELS[pref.id]}`}
+                aria-label={t('browser.drag_screen', { screen: t(`screen_label.${pref.id}`) })}
                 style={{
                   color: 'var(--color-text-dim)',
                   fontSize: 18,
@@ -558,7 +554,7 @@ function ScreensEditor() {
                 }}
                 onClick={() => { if (!isLastEnabled) toggle(pref.id) }}
               >
-                {SCREEN_LABELS[pref.id]}
+                {t(`screen_label.${pref.id}`)}
               </span>
             </li>
           )
@@ -568,17 +564,61 @@ function ScreensEditor() {
   )
 }
 
+function LanguagePicker() {
+  const [locale, setLocale] = useState<Locale>(() => getActiveLocale())
+
+  useEffect(() => {
+    const sync = () => setLocale(getActiveLocale())
+    onSettingsLoaded(sync)
+    onLocaleChanged(sync)
+  }, [])
+
+  const onValueChange = (next: string) => {
+    void setActiveLocale(next as Locale).then(() => {
+      setLocale(next as Locale)
+      // Redraw glasses with the new locale (wmo descriptions, weekday labels,
+      // moon phase names, etc. all change). City list itself is already
+      // refreshed by setActiveLocale, which re-resolves saved cities.
+      void refreshWeather()
+    })
+  }
+
+  const options = SUPPORTED_LOCALES.map(l => ({ value: l, label: LOCALE_LABELS[l] }))
+
+  return (
+    <div className="weather-card">
+      <Select value={locale} options={options} onValueChange={onValueChange} />
+    </div>
+  )
+}
+
+// Forces SettingsPanel + children to re-render when locale changes so every
+// inline t() call picks up the new dictionary. Children that already
+// subscribe (Cities, Screens, Units) would re-render on their own listeners,
+// but headings and labels rendered inline would not.
+function useLocaleTick(): number {
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    onLocaleChanged(() => setTick(n => n + 1))
+  }, [])
+  return tick
+}
+
 function SettingsPanel() {
+  useLocaleTick()
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      <h2 className="text-large-title" style={{ margin: '0 0 var(--spacing-cross)' }}>Cities</h2>
+      <h2 className="text-large-title" style={{ margin: '0 0 var(--spacing-cross)' }}>{t('browser.cities')}</h2>
       <CitiesEditor />
 
-      <h2 className="text-large-title" style={{ margin: 'var(--spacing-cross) 0' }}>Units</h2>
+      <h2 className="text-large-title" style={{ margin: 'var(--spacing-cross) 0' }}>{t('browser.units')}</h2>
       <UnitPicker />
 
-      <h2 className="text-large-title" style={{ margin: 'var(--spacing-cross) 0' }}>Screens</h2>
+      <h2 className="text-large-title" style={{ margin: 'var(--spacing-cross) 0' }}>{t('browser.screens')}</h2>
       <ScreensEditor />
+
+      <h2 className="text-large-title" style={{ margin: 'var(--spacing-cross) 0' }}>{t('browser.language')}</h2>
+      <LanguagePicker />
 
     </div>
   )
@@ -605,6 +645,13 @@ export function initUI(): void {
   // to it before the bridge is ready).
   const logPanel = document.getElementById('log-panel')
   if (logPanel) app.appendChild(logPanel)
+
+  const logSummary = document.getElementById('log-summary')
+  if (logSummary) logSummary.textContent = t('browser.show_log')
+  onLocaleChanged(() => {
+    const s = document.getElementById('log-summary')
+    if (s) s.textContent = t('browser.show_log')
+  })
 
   createRoot(container).render(
     <React.StrictMode>

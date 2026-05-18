@@ -3,6 +3,7 @@ import {
   TextContainerProperty,
 } from '@evenrealities/even_hub_sdk'
 import { appendEventLog } from '../../_shared/log'
+import { t } from '../i18n'
 import { DISPLAY_WIDTH } from '../layout'
 import { state } from '../state'
 import type { HourlyPoint, WeatherData } from '../state'
@@ -44,11 +45,11 @@ const PRESSURE_CEIL = 1040
 
 function trendLabel(w: WeatherData): string {
   const hours = w.hourly.slice(0, CHART_HOURS_VISIBLE)
-  if (hours.length < 2) return 'steady'
+  if (hours.length < 2) return t('pressure_trend.steady')
   const delta = hours[hours.length - 1].pressure - hours[0].pressure
-  if (delta >= 2) return 'rising'
-  if (delta <= -2) return 'falling'
-  return 'steady'
+  if (delta >= 2) return t('pressure_trend.rising')
+  if (delta <= -2) return t('pressure_trend.falling')
+  return t('pressure_trend.steady')
 }
 
 function pressureTimesText(w: WeatherData): string {
@@ -126,7 +127,7 @@ export async function showPressureScreen(w: WeatherData): Promise<void> {
       new TextContainerProperty({
         containerID: 5,
         containerName: 'preslabel',
-        content: 'pressure',
+        content: t('glasses.label_pressure'),
         xPosition: CHART_TOTAL_X,
         yPosition: CHART_LABEL_TOP_Y,
         width: CHART_TOTAL_W,

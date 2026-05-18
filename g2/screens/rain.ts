@@ -3,6 +3,7 @@ import {
   TextContainerProperty,
 } from '@evenrealities/even_hub_sdk'
 import { appendEventLog } from '../../_shared/log'
+import { t } from '../i18n'
 import { DISPLAY_WIDTH } from '../layout'
 import { state } from '../state'
 import type { WeatherData } from '../state'
@@ -55,8 +56,8 @@ function rainPeakLine(w: WeatherData): string {
   const next = w.hourly.slice(0, 12)
   if (next.length === 0) return ''
   const peak = next.reduce((best, h) => h.precipProb > best.precipProb ? h : best, next[0])
-  if (peak.precipProb === 0) return 'no rain expected'
-  return `peak ${peak.precipProb}% at ${displayTime(peak.time)}`
+  if (peak.precipProb === 0) return t('glasses.no_rain')
+  return t('glasses.peak_at', { pct: peak.precipProb, time: displayTime(peak.time) })
 }
 
 export async function showRainScreen(w: WeatherData): Promise<void> {
@@ -115,7 +116,7 @@ export async function showRainScreen(w: WeatherData): Promise<void> {
       new TextContainerProperty({
         containerID: 5,
         containerName: 'preciplabel',
-        content: 'precipitation',
+        content: t('glasses.label_precipitation'),
         xPosition: CHART_TOTAL_X,
         yPosition: CHART_LABEL_TOP_Y,
         width: CHART_TOTAL_W,
@@ -126,7 +127,7 @@ export async function showRainScreen(w: WeatherData): Promise<void> {
       new TextContainerProperty({
         containerID: 6,
         containerName: 'unit',
-        content: `${precipUnit()} today`,
+        content: t('glasses.unit_today', { unit: precipUnit() }),
         xPosition: CHART_TOTAL_X,
         yPosition: CHART_LABEL_BOT_Y,
         width: CHART_TOTAL_W,

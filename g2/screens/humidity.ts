@@ -5,6 +5,7 @@ import {
 import { appendEventLog } from '../../_shared/log'
 import { DISPLAY_WIDTH } from '../layout'
 import { humidityComfort } from '../api'
+import { t } from '../i18n'
 import { state } from '../state'
 import type { WeatherData } from '../state'
 import {
@@ -66,7 +67,7 @@ export async function showHumidityScreen(w: WeatherData): Promise<void> {
       new TextContainerProperty({
         containerID: 1,
         containerName: 'header',
-        content: `${w.city.toLowerCase()}  ·  ${w.currentTemp}°  ·  ${todayDateString()}  ·  feels ${comfort}`,
+        content: `${w.city.toLowerCase()}  ·  ${w.currentTemp}°  ·  ${todayDateString()}  ·  ${t('glasses.feels_comfort', { comfort })}`,
         xPosition: CHART_PAD,
         yPosition: 2,
         width: DISPLAY_WIDTH - CHART_PAD * 2,
@@ -110,7 +111,7 @@ export async function showHumidityScreen(w: WeatherData): Promise<void> {
       new TextContainerProperty({
         containerID: 5,
         containerName: 'humlabel',
-        content: 'humidity',
+        content: t('glasses.label_humidity'),
         xPosition: CHART_TOTAL_X,
         yPosition: CHART_LABEL_TOP_Y,
         width: CHART_TOTAL_W,
@@ -121,7 +122,7 @@ export async function showHumidityScreen(w: WeatherData): Promise<void> {
       new TextContainerProperty({
         containerID: 6,
         containerName: 'humsub',
-        content: `dew ${w.hourly[0]?.dewPoint ?? 0}°`,
+        content: t('glasses.dew', { value: w.hourly[0]?.dewPoint ?? 0 }),
         xPosition: CHART_TOTAL_X,
         yPosition: CHART_LABEL_BOT_Y,
         width: CHART_TOTAL_W,
