@@ -13,6 +13,7 @@ import {
 import { refreshWeather } from './app'
 import { LOCALE_LABELS, SUPPORTED_LOCALES, t, type Locale } from './i18n'
 import type { City, ScreenPref, UnitPrefs } from './state'
+import appManifest from '../app.json'
 
 function autoConnect() {
   document.getElementById('connectBtn')?.click()
@@ -684,7 +685,7 @@ function BuyMeCoffeeButton() {
         marginBottom: 'var(--spacing-cross)',
       }}
     >
-      Enjoying Weather? ❤️ Buy me coffee
+      {t('browser.coffee_button')}
     </a>
   )
 }
@@ -695,18 +696,38 @@ function SettingsPanel() {
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       <BuyMeCoffeeButton />
 
-      <h2 className="text-large-title" style={{ margin: '0 0 var(--spacing-cross)' }}>{t('browser.cities')}</h2>
+      <h2 className="text-large-title" style={{ margin: '0 0 var(--spacing-cross)' }}>{t('browser.language')}</h2>
+      <LanguagePicker />
+
+      <h2 className="text-large-title" style={{ margin: 'var(--spacing-cross) 0' }}>{t('browser.cities')}</h2>
       <CitiesEditor />
 
       <h2 className="text-large-title" style={{ margin: 'var(--spacing-cross) 0' }}>{t('browser.units')}</h2>
       <UnitPicker />
 
-      <h2 className="text-large-title" style={{ margin: 'var(--spacing-cross) 0' }}>{t('browser.language')}</h2>
-      <LanguagePicker />
-
       <h2 className="text-large-title" style={{ margin: 'var(--spacing-cross) 0' }}>{t('browser.screens')}</h2>
       <ScreensEditor />
 
+      <AboutCard />
+    </div>
+  )
+}
+
+function AboutCard() {
+  const linkStyle: React.CSSProperties = { color: 'var(--color-accent, #007aff)', textDecoration: 'none' }
+  const para: React.CSSProperties = { margin: '0 0 12px' }
+  return (
+    <div className="weather-card" style={{ marginTop: 'var(--spacing-cross)' }}>
+      <h2 className="text-large-title" style={{ margin: '0 0 12px' }}>
+        {t('browser.about_title')}{' '}
+        <span style={{ color: 'var(--color-text-dim)' }}>v{appManifest.version}</span>
+      </h2>
+      <p className="text-normal-body" style={para}>{t('browser.about_description')}</p>
+      <p className="text-normal-body" style={para}>{t('browser.about_data')}</p>
+      <p className="text-normal-body" style={{ margin: 0 }}>
+        {t('browser.about_by')}
+        <a href="mailto:nick@ustinov.cc" style={linkStyle}>nick@ustinov.cc</a>
+      </p>
     </div>
   )
 }

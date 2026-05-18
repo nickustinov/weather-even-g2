@@ -14,7 +14,12 @@
     "show_log": "显示日志",
     "drag_city": "移动 {city}",
     "remove_city": "删除 {city}",
-    "drag_screen": "移动 {screen}"
+    "drag_screen": "移动 {screen}",
+    "coffee_button": "☕ 请我喝杯咖啡",
+    "about_title": "Weather for Even G2",
+    "about_description": "在眼镜上一目了然的天气 — 当前状况、逐小时预报、10天展望、空气质量、日月。多个城市、您的单位、您的语言。",
+    "about_data": "天气数据来自 Open-Meteo — 免费、开放、无需 API 密钥。",
+    "about_by": "作者: Nick Ustinov · "
   },
   "screen_label": {
     "today": "今天",

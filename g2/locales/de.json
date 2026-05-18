@@ -14,7 +14,12 @@
     "show_log": "Protokoll anzeigen",
     "drag_city": "{city} verschieben",
     "remove_city": "{city} entfernen",
-    "drag_screen": "{screen} verschieben"
+    "drag_screen": "{screen} verschieben",
+    "coffee_button": "☕ Spendier mir einen Kaffee",
+    "about_title": "Weather für Even G2",
+    "about_description": "Wetter auf einen Blick auf deiner Brille — aktuelle Bedingungen, stündliche Vorhersage, 10-Tage-Ausblick, Luftqualität, Sonne und Mond. Mehrere Städte, deine Einheiten, deine Sprache.",
+    "about_data": "Wetterdaten von Open-Meteo — kostenlos, offen, kein API-Schlüssel.",
+    "about_by": "Von Nick Ustinov · "
   },
   "screen_label": {
     "today": "Heute",

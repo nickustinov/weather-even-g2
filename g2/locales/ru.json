@@ -14,7 +14,12 @@
     "show_log": "Показать журнал",
     "drag_city": "Перетащить {city}",
     "remove_city": "Удалить {city}",
-    "drag_screen": "Перетащить {screen}"
+    "drag_screen": "Перетащить {screen}",
+    "coffee_button": "☕ Угости меня кофе",
+    "about_title": "Weather для Even G2",
+    "about_description": "Погода прямо в очках — текущие условия, почасовой прогноз, прогноз на 10 дней, качество воздуха, солнце и луна. Несколько городов, ваши единицы, ваш язык.",
+    "about_data": "Данные прогноза от Open-Meteo — свободно, открыто, без API-ключа.",
+    "about_by": "Автор: Nick Ustinov · "
   },
   "screen_label": {
     "today": "Сегодня",

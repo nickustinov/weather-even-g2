@@ -14,7 +14,12 @@
     "show_log": "로그 표시",
     "drag_city": "{city} 이동",
     "remove_city": "{city} 제거",
-    "drag_screen": "{screen} 이동"
+    "drag_screen": "{screen} 이동",
+    "coffee_button": "☕ 커피 한 잔 사주세요",
+    "about_title": "Weather for Even G2",
+    "about_description": "안경에서 한눈에 보는 날씨 — 현재 상태, 시간별 예보, 10일 예보, 공기질, 해와 달. 여러 도시, 원하는 단위, 원하는 언어.",
+    "about_data": "예보 데이터는 Open-Meteo 제공 — 무료, 오픈, API 키 불필요.",
+    "about_by": "제작: Nick Ustinov · "
   },
   "screen_label": {
     "today": "오늘",
