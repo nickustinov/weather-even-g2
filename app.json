@@ -9,7 +9,7 @@
   "entrypoint": "index.html",
   "min_app_version": "0.1.0",
   "min_sdk_version": "0.0.9",
-  "supported_languages": ["en", "zh", "es", "fr", "pt", "ru", "de", "ja", "ko", "it", "nl"],
+  "supported_languages": ["en", "zh", "es", "fr", "de", "ja", "ko", "it"],
   "permissions": [
     {
       "name": "network",
