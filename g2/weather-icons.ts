@@ -3,18 +3,25 @@
 // suits the dotted/textured monochrome aesthetic at small sizes.
 
 import sunSvg from '@phosphor-icons/core/assets/thin/sun-thin.svg?raw'
+import moonSvg from '@phosphor-icons/core/assets/thin/moon-thin.svg?raw'
 import cloudSunSvg from '@phosphor-icons/core/assets/thin/cloud-sun-thin.svg?raw'
+import cloudMoonSvg from '@phosphor-icons/core/assets/thin/cloud-moon-thin.svg?raw'
 import cloudSvg from '@phosphor-icons/core/assets/thin/cloud-thin.svg?raw'
 import cloudFogSvg from '@phosphor-icons/core/assets/thin/cloud-fog-thin.svg?raw'
 import cloudRainSvg from '@phosphor-icons/core/assets/thin/cloud-rain-thin.svg?raw'
 import cloudSnowSvg from '@phosphor-icons/core/assets/thin/cloud-snow-thin.svg?raw'
 import cloudLightningSvg from '@phosphor-icons/core/assets/thin/cloud-lightning-thin.svg?raw'
 
-type IconKey = 'sun' | 'cloudSun' | 'cloud' | 'cloudFog' | 'cloudRain' | 'cloudSnow' | 'cloudLightning'
+type IconKey =
+  | 'sun' | 'moon'
+  | 'cloudSun' | 'cloudMoon'
+  | 'cloud' | 'cloudFog' | 'cloudRain' | 'cloudSnow' | 'cloudLightning'
 
 const SVGS: Record<IconKey, string> = {
   sun: sunSvg,
+  moon: moonSvg,
   cloudSun: cloudSunSvg,
+  cloudMoon: cloudMoonSvg,
   cloud: cloudSvg,
   cloudFog: cloudFogSvg,
   cloudRain: cloudRainSvg,
@@ -22,9 +29,11 @@ const SVGS: Record<IconKey, string> = {
   cloudLightning: cloudLightningSvg,
 }
 
-export function wmoToIconKey(wmoCode: number): IconKey {
-  if (wmoCode === 0) return 'sun'
-  if (wmoCode <= 2) return 'cloudSun'
+// Only clear/mainly-clear/partly-cloudy have day-vs-night variants. Rain,
+// snow, fog, storm look the same at night so they reuse a single icon.
+export function wmoToIconKey(wmoCode: number, isDay = true): IconKey {
+  if (wmoCode === 0) return isDay ? 'sun' : 'moon'
+  if (wmoCode <= 2) return isDay ? 'cloudSun' : 'cloudMoon'
   if (wmoCode === 3) return 'cloud'
   if (wmoCode === 45 || wmoCode === 48) return 'cloudFog'
   if (wmoCode >= 51 && wmoCode <= 67) return 'cloudRain'
@@ -78,7 +87,8 @@ export async function drawWeatherIcon(
   cx: number,
   cy: number,
   size: number,
+  isDay = true,
 ): Promise<void> {
-  const img = await loadIcon(wmoToIconKey(wmoCode))
+  const img = await loadIcon(wmoToIconKey(wmoCode, isDay))
   ctx.drawImage(img, Math.round(cx - size / 2), Math.round(cy - size / 2), size, size)
 }

@@ -351,6 +351,16 @@ export function wmoDescription(code: number): string {
   return t('wmo_long.unknown')
 }
 
+// Headline-friendly summary that appends cloud-cover percentage to the
+// cloud-related WMO codes (1=mainly clear, 2=partly cloudy, 3=overcast)
+// where the number adds real signal. Clear (0) and precipitation codes
+// stay description-only — appending "0% cloud" to "clear sky" is noise.
+export function wmoSummary(code: number, cloudCover: number): string {
+  const desc = wmoDescription(code)
+  if (code >= 1 && code <= 3) return `${desc} ${cloudCover}%`
+  return desc
+}
+
 // Always returns 24h "HH:MM"; display-time formatting lives in
 // render-shared.ts (displayTime/displayTimeCompact) so internal helpers
 // like timeToMinutes can keep parsing a stable canonical shape.
@@ -372,6 +382,8 @@ type OpenMeteoForecast = {
     wind_direction_10m?: number
     wind_gusts_10m?: number
     surface_pressure?: number
+    is_day?: number
+    cloud_cover?: number
   }
   hourly?: {
     time?: string[]
@@ -386,6 +398,8 @@ type OpenMeteoForecast = {
     dew_point_2m?: number[]
     uv_index?: number[]
     surface_pressure?: number[]
+    is_day?: number[]
+    cloud_cover?: number[]
   }
   daily?: {
     time?: string[]
@@ -407,8 +421,8 @@ export async function fetchWeather(city: City, prefs: UnitPrefs = DEFAULT_UNIT_P
     latitude: String(city.latitude),
     longitude: String(city.longitude),
     current:
-      'temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,surface_pressure',
-    hourly: 'temperature_2m,weather_code,precipitation_probability,precipitation,wind_speed_10m,wind_direction_10m,wind_gusts_10m,relative_humidity_2m,dew_point_2m,uv_index,surface_pressure',
+      'temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,surface_pressure,is_day,cloud_cover',
+    hourly: 'temperature_2m,weather_code,precipitation_probability,precipitation,wind_speed_10m,wind_direction_10m,wind_gusts_10m,relative_humidity_2m,dew_point_2m,uv_index,surface_pressure,is_day,cloud_cover',
     daily:
       'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,wind_speed_10m_max,uv_index_max,sunshine_duration,sunrise,sunset',
     timezone: 'auto',
@@ -448,6 +462,8 @@ export async function fetchWeather(city: City, prefs: UnitPrefs = DEFAULT_UNIT_P
         dewPoint: Math.round(hourly.dew_point_2m?.[idx] ?? 0),
         uvIndex: Math.round((hourly.uv_index?.[idx] ?? 0) * 10) / 10,
         pressure: Math.round(hourly.surface_pressure?.[idx] ?? 0),
+        isDay: (hourly.is_day?.[idx] ?? 1) === 1,
+        cloudCover: Math.round(hourly.cloud_cover?.[idx] ?? 0),
       }
     })
 
@@ -477,6 +493,8 @@ export async function fetchWeather(city: City, prefs: UnitPrefs = DEFAULT_UNIT_P
     city: city.name,
     currentTemp: Math.round(current.temperature_2m ?? 0),
     currentWmoCode: current.weather_code ?? 0,
+    currentIsDay: (current.is_day ?? 1) === 1,
+    currentCloudCover: Math.round(current.cloud_cover ?? 0),
     feelsLike: Math.round(current.apparent_temperature ?? 0),
     windSpeed: Math.round(current.wind_speed_10m ?? 0),
     windGust: Math.round(current.wind_gusts_10m ?? 0),

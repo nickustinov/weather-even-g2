@@ -50,6 +50,8 @@ export type HourlyPoint = {
   dewPoint: number
   uvIndex: number
   pressure: number
+  isDay: boolean
+  cloudCover: number
 }
 
 export type DailyPoint = {
@@ -88,6 +90,8 @@ export type WeatherData = {
   city: string
   currentTemp: number
   currentWmoCode: number
+  currentIsDay: boolean
+  currentCloudCover: number
   feelsLike: number
   windSpeed: number
   windGust: number

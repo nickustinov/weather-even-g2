@@ -3,7 +3,7 @@ import {
   TextContainerProperty,
 } from '@evenrealities/even_hub_sdk'
 import { appendEventLog } from '../../_shared/log'
-import { getSavedCity, wmoDescription } from '../api'
+import { getSavedCity, wmoSummary } from '../api'
 import { t } from '../i18n'
 import { DISPLAY_WIDTH } from '../layout'
 import { canvasToBytes } from '../icons'
@@ -133,7 +133,7 @@ export async function showSunScreen(w: WeatherData): Promise<void> {
       new TextContainerProperty({
         containerID: 1,
         containerName: 'header',
-        content: `${w.city.toLowerCase()}  ·  ${w.currentTemp}°  ·  ${todayDateString()}  ·  ${wmoDescription(w.currentWmoCode)}`,
+        content: `${w.city.toLowerCase()}  ·  ${w.currentTemp}°  ·  ${todayDateString()}  ·  ${wmoSummary(w.currentWmoCode, w.currentCloudCover)}`,
         xPosition: CHART_PAD,
         yPosition: 2,
         width: DISPLAY_WIDTH - CHART_PAD * 2,

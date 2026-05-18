@@ -3,7 +3,7 @@ import {
   TextContainerProperty,
 } from '@evenrealities/even_hub_sdk'
 import { appendEventLog } from '../../_shared/log'
-import { wmoDescription } from '../api'
+import { wmoSummary } from '../api'
 import { DISPLAY_WIDTH } from '../layout'
 import { canvasToBytes } from '../icons'
 import { state } from '../state'
@@ -60,16 +60,16 @@ function percentsText(hours: HourlyPoint[]): string {
   return hours.map(h => `${h.precipProb}%`).join('\n')
 }
 
-async function renderIconStrip(codes: number[]): Promise<number[]> {
+async function renderIconStrip(rows: { code: number; isDay: boolean }[]): Promise<number[]> {
   const canvas = document.createElement('canvas')
   canvas.width = HOURS_ICON_W
-  canvas.height = HOURS_ROW_H * codes.length
+  canvas.height = HOURS_ROW_H * rows.length
   const ctx = canvas.getContext('2d')!
   ctx.fillStyle = '#000'
   ctx.fillRect(0, 0, canvas.width, canvas.height)
-  for (let i = 0; i < codes.length; i++) {
+  for (let i = 0; i < rows.length; i++) {
     const cy = i * HOURS_ROW_H + HOURS_ROW_H / 2
-    await drawWeatherIcon(ctx, codes[i], canvas.width / 2, cy, HOURS_ICON_DIAMETER)
+    await drawWeatherIcon(ctx, rows[i].code, canvas.width / 2, cy, HOURS_ICON_DIAMETER, rows[i].isDay)
   }
   return canvasToBytes(canvas)
 }
@@ -162,7 +162,7 @@ export async function showHoursScreen(w: WeatherData): Promise<void> {
       new TextContainerProperty({
         containerID: HEADER_ID,
         containerName: 'header',
-        content: `${w.city.toLowerCase()}  ·  ${w.currentTemp}°  ·  ${todayDateString()}  ·  ${wmoDescription(w.currentWmoCode)}`,
+        content: `${w.city.toLowerCase()}  ·  ${w.currentTemp}°  ·  ${todayDateString()}  ·  ${wmoSummary(w.currentWmoCode, w.currentCloudCover)}`,
         xPosition: 8,
         yPosition: 2,
         width: DISPLAY_WIDTH - 16,
@@ -179,12 +179,12 @@ export async function showHoursScreen(w: WeatherData): Promise<void> {
     ],
   })
 
-  const leftCodes = leftHours.map(h => h.wmoCode)
-  const rightCodes = rightHours.map(h => h.wmoCode)
-  await sendImage(await renderIconStrip(leftCodes.slice(0, HOURS_STRIP_ROWS)), LEFT_IDS.icons1Id, 'icons-left-1')
-  await sendImage(await renderIconStrip(leftCodes.slice(HOURS_STRIP_ROWS)), LEFT_IDS.icons2Id, 'icons-left-2')
-  await sendImage(await renderIconStrip(rightCodes.slice(0, HOURS_STRIP_ROWS)), RIGHT_IDS.icons1Id, 'icons-right-1')
-  await sendImage(await renderIconStrip(rightCodes.slice(HOURS_STRIP_ROWS)), RIGHT_IDS.icons2Id, 'icons-right-2')
+  const leftRows = leftHours.map(h => ({ code: h.wmoCode, isDay: h.isDay }))
+  const rightRows = rightHours.map(h => ({ code: h.wmoCode, isDay: h.isDay }))
+  await sendImage(await renderIconStrip(leftRows.slice(0, HOURS_STRIP_ROWS)), LEFT_IDS.icons1Id, 'icons-left-1')
+  await sendImage(await renderIconStrip(leftRows.slice(HOURS_STRIP_ROWS)), LEFT_IDS.icons2Id, 'icons-left-2')
+  await sendImage(await renderIconStrip(rightRows.slice(0, HOURS_STRIP_ROWS)), RIGHT_IDS.icons1Id, 'icons-right-1')
+  await sendImage(await renderIconStrip(rightRows.slice(HOURS_STRIP_ROWS)), RIGHT_IDS.icons2Id, 'icons-right-2')
 
   appendEventLog(`Screen: ${state.screen}`)
 }

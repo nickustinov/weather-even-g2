@@ -68,14 +68,14 @@ export async function sendImage(bytes: number[], containerID: number, containerN
 // Image rendering helpers
 // ---------------------------------------------------------------------------
 
-export async function renderWeatherIconBytes(wmoCode: number, size: number): Promise<number[]> {
+export async function renderWeatherIconBytes(wmoCode: number, size: number, isDay = true): Promise<number[]> {
   const canvas = document.createElement('canvas')
   canvas.width = size
   canvas.height = size
   const ctx = canvas.getContext('2d')!
   ctx.fillStyle = '#000'
   ctx.fillRect(0, 0, size, size)
-  await drawWeatherIcon(ctx, wmoCode, size / 2, size / 2, size)
+  await drawWeatherIcon(ctx, wmoCode, size / 2, size / 2, size, isDay)
   return canvasToBytes(canvas)
 }
 

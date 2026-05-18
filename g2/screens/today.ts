@@ -3,7 +3,7 @@ import {
   TextContainerProperty,
 } from '@evenrealities/even_hub_sdk'
 import { appendEventLog } from '../../_shared/log'
-import { wmoDescription } from '../api'
+import { wmoSummary } from '../api'
 import { t } from '../i18n'
 import { DISPLAY_WIDTH, DISPLAY_HEIGHT } from '../layout'
 import { state } from '../state'
@@ -80,7 +80,7 @@ function todayDegreePosition(temp: number): { x: number; y: number } {
 }
 
 function todayHeader(w: WeatherData): string {
-  return `${w.city.toLowerCase()}  ·  ${todayDateString()}  ·  ${wmoDescription(w.currentWmoCode).toLowerCase()}`
+  return `${w.city.toLowerCase()}  ·  ${todayDateString()}  ·  ${wmoSummary(w.currentWmoCode, w.currentCloudCover).toLowerCase()}`
 }
 
 function todayRangeAndDaylight(today: WeatherData['daily'][number], w: WeatherData): string {
@@ -189,6 +189,6 @@ export async function showTodayScreen(w: WeatherData): Promise<void> {
   })
 
   await sendImage(renderDottedNumberBytes(headlineText, TODAY_TEMP_W, TODAY_TEMP_H, TODAY_HEADLINE_OPTS), 5, 'headline')
-  await sendImage(await renderWeatherIconBytes(w.currentWmoCode, TODAY_CONDITION_ICON_SIZE), 6, 'condition')
+  await sendImage(await renderWeatherIconBytes(w.currentWmoCode, TODAY_CONDITION_ICON_SIZE, w.currentIsDay), 6, 'condition')
   appendEventLog(`Screen: ${state.screen}`)
 }
