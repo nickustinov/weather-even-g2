@@ -366,11 +366,10 @@ export function wmoSummary(code: number, cloudCover: number): string {
 // render-shared.ts (displayTime/displayTimeCompact) so internal helpers
 // like timeToMinutes can keep parsing a stable canonical shape.
 function formatTime(isoString: string): string {
-  return new Date(isoString).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
+  const d = new Date(isoString)
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  return `${hh}:${mm}`
 }
 
 type OpenMeteoForecast = {
