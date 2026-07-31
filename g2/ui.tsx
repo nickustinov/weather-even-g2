@@ -140,18 +140,17 @@ function CitiesEditor() {
     return originalInsert > fromIndex ? originalInsert - 1 : originalInsert
   }
 
-  // Reorder operates on the saved cities only. The GPS entry is rendered
-  // separately above the list and never enters `saved`, so its position is
-  // fixed and the drag indices stay aligned with what setCities persists.
+  // The GPS entry takes part in the reorder like any other row. setCities
+  // records where it landed and strips it before persisting, so it stays
+  // draggable without becoming a saved city.
   const saved = cities.filter(c => c.kind !== 'current')
-  const current = cities.find(c => c.kind === 'current') ?? null
 
   const move = (from: number, to: number) => {
-    if (from === to || from < 0 || to < 0 || from >= saved.length || to >= saved.length) return
-    const next = saved.slice()
+    if (from === to || from < 0 || to < 0 || from >= cities.length || to >= cities.length) return
+    const next = cities.slice()
     const [moved] = next.splice(from, 1)
     next.splice(to, 0, moved)
-    setCitiesState([...(current ? [current] : []), ...next])
+    setCitiesState(next)
     void setCities(next)
   }
 
@@ -194,47 +193,18 @@ function CitiesEditor() {
   const savedKeys = new Set(saved.map(cityKey))
   const filteredResults = results.filter(r => !savedKeys.has(cityKey(r)))
 
-  const currentIsActive = !!active && !!current && cityKey(active) === cityKey(current)
-  const currentLabel = current && current.name
-    ? cityLabel(current)
-    : t('browser.location_unavailable')
-
   return (
     <div className="weather-card">
-      {current && (
-        <div
-          style={{ ...cityRowStyle, marginBottom: saved.length > 0 ? 6 : 'var(--spacing-cross)' }}
-        >
-          {/* No drag handle and no remove button: this entry is permanent.
-              A hidden copy of the handle reserves the column instead of a
-              fixed width, so the radio lines up with the draggable rows
-              exactly rather than approximately. */}
-          <span aria-hidden="true" style={{ ...dragHandleStyle, visibility: 'hidden' }}>⋮⋮</span>
-          <ActiveRadio active={currentIsActive} onSelect={() => handleSelect(current)} />
-          <span
-            className="text-medium-body"
-            style={{ flex: 1, color: 'var(--color-text)', cursor: 'pointer' }}
-            onClick={() => handleSelect(current)}
-          >
-            ⌖ {currentLabel}
-            <span style={{ display: 'block', color: 'var(--color-text-dim)', fontSize: '0.78em' }}>
-              {isCurrentLocationStale()
-                ? t('browser.location_last_known')
-                : t('browser.location_current')}
-            </span>
-          </span>
-        </div>
-      )}
-
-      {saved.length > 0 && (
+      {cities.length > 0 && (
         <ul
           ref={listRef}
           style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 'var(--spacing-cross)' }}
         >
-          {saved.map((city, index) => {
+          {cities.map((city, index) => {
             const key = cityKey(city)
             const isActive = !!active && cityKey(active) === key
             const isDragging = dragKey === key
+            const isCurrent = city.kind === 'current'
             return (
               <li
                 key={key}
@@ -289,15 +259,28 @@ function CitiesEditor() {
                   style={{ flex: 1, color: 'var(--color-text)', cursor: 'pointer' }}
                   onClick={() => handleSelect(city)}
                 >
-                  {cityLabel(city)}
+                  {isCurrent ? `⌖ ${city.name ? cityLabel(city) : t('browser.location_unavailable')}` : cityLabel(city)}
+                  {isCurrent && (
+                    <span style={{ display: 'block', color: 'var(--color-text-dim)', fontSize: '0.78em' }}>
+                      {isCurrentLocationStale()
+                        ? t('browser.location_last_known')
+                        : t('browser.location_current')}
+                    </span>
+                  )}
                 </span>
-                <button
-                  onClick={() => handleRemove(city)}
-                  aria-label={t('browser.remove_city', { city: cityLabel(city) })}
-                  style={iconBtnStyle}
-                >
-                  ×
-                </button>
+                {/* The GPS entry is permanent, so it gets no delete button. No
+                    spacer is needed: the label above is flex:1 and simply
+                    absorbs the width, unlike the drag-handle column on the
+                    left where an omission would visibly shift the row. */}
+                {!isCurrent && (
+                  <button
+                    onClick={() => handleRemove(city)}
+                    aria-label={t('browser.remove_city', { city: cityLabel(city) })}
+                    style={iconBtnStyle}
+                  >
+                    ×
+                  </button>
+                )}
               </li>
             )
           })}
@@ -645,97 +628,10 @@ function useLocaleTick(): number {
   return tick
 }
 
-// Lemon Squeezy overlay checkout. lemon.js's auto-scan runs at
-// DOMContentLoaded, before React mounts this anchor — so we drive the
-// overlay programmatically and call Setup() to register an event handler
-// (without it the close-X postMessage from the overlay iframe has no
-// listener and the X appears dead).
-const LEMON_CHECKOUT_URL =
-  'https://store.itsyapps.com/checkout/buy/a94ce3c8-a375-4bc0-bb4f-74958ac037e8?embed=1&media=0&logo=0&desc=0&discount=0'
-
-type LemonSqueezy = {
-  Setup: (opts: { eventHandler: (event: { event: string }) => void }) => void
-  Url: {
-    Open: (url: string) => void
-    Close: () => void
-  }
-  Refresh: () => void
-}
-
-declare global {
-  interface Window {
-    createLemonSqueezy?: () => void
-    LemonSqueezy?: LemonSqueezy
-  }
-}
-
-async function ensureLemonReady(): Promise<LemonSqueezy | null> {
-  const start = Date.now()
-  while (Date.now() - start < 4000) {
-    if (window.LemonSqueezy) return window.LemonSqueezy
-    if (window.createLemonSqueezy) {
-      window.createLemonSqueezy()
-      if (window.LemonSqueezy) return window.LemonSqueezy
-    }
-    await new Promise(r => setTimeout(r, 100))
-  }
-  return null
-}
-
-let lemonInitialized = false
-function initLemonOnce(): void {
-  if (lemonInitialized) return
-  lemonInitialized = true
-  void ensureLemonReady().then(ls => {
-    if (!ls) return
-    ls.Setup({
-      eventHandler: () => {
-        // Closes the overlay when the iframe posts the close event. With no
-        // handler registered the X button's message is ignored by the
-        // parent window and the overlay stays open.
-      },
-    })
-  })
-}
-
-function BuyMeCoffeeButton() {
-  useEffect(() => { initLemonOnce() }, [])
-
-  const onClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault()
-    void ensureLemonReady().then(ls => {
-      if (ls) ls.Url.Open(LEMON_CHECKOUT_URL)
-      else window.open(LEMON_CHECKOUT_URL, '_blank')
-    })
-  }
-
-  return (
-    <a
-      href={LEMON_CHECKOUT_URL}
-      onClick={onClick}
-      style={{
-        display: 'block',
-        textAlign: 'center',
-        background: 'var(--color-accent-warning)',
-        color: '#232323',
-        textDecoration: 'none',
-        padding: '12px 16px',
-        borderRadius: 'var(--radius-default)',
-        fontWeight: 600,
-        marginBottom: 'var(--spacing-cross)',
-      }}
-    >
-      {t('browser.coffee_button')}
-    </a>
-  )
-}
-
 function SettingsPanel() {
   useLocaleTick()
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      <BuyMeCoffeeButton />
-
       <h2 className="text-large-title" style={{ margin: '0 0 var(--spacing-cross)' }}>{t('browser.language')}</h2>
       <LanguagePicker />
 
@@ -749,8 +645,6 @@ function SettingsPanel() {
       <ScreensEditor />
 
       <AboutCard />
-
-      <BuyMeCoffeeButton />
     </div>
   )
 }

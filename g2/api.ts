@@ -13,6 +13,7 @@ const CITY_KEY = 'weather:city'        // legacy: single-city storage, migrated
 const CITIES_KEY = 'weather:cities'
 const ACTIVE_KEY = 'weather:active-city'
 const CURRENT_LOC_KEY = 'weather:current-location'
+const CURRENT_POS_KEY = 'weather:current-position'
 const UNIT_KEY = 'weather:unit'        // legacy: 'metric'|'imperial', migrated
 const UNIT_PREFS_KEY = 'weather:units'
 const SCREENS_KEY = 'weather:screens'
@@ -33,11 +34,19 @@ type StoredLocation = {
   admin1: string
   country: string
   updatedAt: number
+  // Open-Meteo id of the resolved place, when the fix matched one. Lets a
+  // locale switch re-fetch the same place by id, exactly as saved cities do.
+  id?: number
 }
 
 let cachedCities: City[] = []
 let cachedActiveKey: string = ''
 let cachedLocation: StoredLocation | null = null
+// Where the GPS entry sits among the saved cities. It is reorderable like any
+// other row, but it is not a member of cachedCities — storing it there would
+// make it deletable and freeze it at one set of coordinates — so its position
+// is tracked separately and applied when the list is read.
+let cachedCurrentPos = 0
 // Whether the most recent fix attempt this session succeeded. Drives the
 // "showing last known position" hint; deliberately not persisted, since a
 // fresh launch has not attempted a fix yet.
@@ -74,6 +83,12 @@ export async function loadSettings(b: EvenAppBridge): Promise<void> {
   }
   const rawActive = await b.getLocalStorage(ACTIVE_KEY)
   if (rawActive) cachedActiveKey = rawActive
+
+  const rawPos = await b.getLocalStorage(CURRENT_POS_KEY)
+  if (rawPos) {
+    const parsed = Number(rawPos)
+    if (Number.isInteger(parsed) && parsed >= 0) cachedCurrentPos = parsed
+  }
 
   const rawLocation = await b.getLocalStorage(CURRENT_LOC_KEY)
   if (rawLocation) {
@@ -223,7 +238,12 @@ export function isCurrentLocationStale(): boolean {
 }
 
 export function getCities(): City[] {
-  return [getCurrentLocationCity(), ...cachedCities]
+  const list = [...cachedCities]
+  // Clamped on read: the saved list can shrink between launches, which would
+  // otherwise leave the stored position past the end.
+  const at = Math.min(Math.max(cachedCurrentPos, 0), list.length)
+  list.splice(at, 0, getCurrentLocationCity())
+  return list
 }
 
 export function getActiveCity(): City | null {
@@ -247,6 +267,7 @@ async function persistCities(): Promise<void> {
   if (!b) return
   await b.setLocalStorage(CITIES_KEY, JSON.stringify(cachedCities))
   await b.setLocalStorage(ACTIVE_KEY, cachedActiveKey)
+  await b.setLocalStorage(CURRENT_POS_KEY, String(cachedCurrentPos))
 }
 
 export async function addCity(city: City): Promise<void> {
@@ -272,12 +293,13 @@ export async function removeCity(key: string): Promise<void> {
   for (const cb of citiesListeners) cb()
 }
 
-// Replace the saved cities list (used by the browser UI drag reorder).
-// Preserves the active key as long as that city is still in the new list.
-// The GPS entry is filtered out defensively: it is pinned and undraggable in
-// the UI, but it must never end up persisted into the saved list, where it
-// would be deletable and would go stale at fixed coordinates.
+// Replace the city list (used by the browser UI drag reorder). Accepts the
+// full displayed list including the GPS entry: its index is recorded as the
+// new position and it is then stripped, so it stays reorderable without ever
+// being persisted as a saved city.
 export async function setCities(cities: City[]): Promise<void> {
+  const currentIndex = cities.findIndex(c => c.kind === 'current')
+  if (currentIndex >= 0) cachedCurrentPos = currentIndex
   cachedCities = cities.filter(c => c.kind !== 'current')
   if (cachedActiveKey !== CURRENT_KEY && !cachedCities.some(c => cityKey(c) === cachedActiveKey)) {
     cachedActiveKey = cachedCities.length > 0 ? cityKey(cachedCities[0]) : ''
@@ -340,6 +362,7 @@ type GeocodeResult = {
   country?: string
   latitude: number
   longitude: number
+  population?: number
 }
 
 function geocodeResultToCity(r: GeocodeResult): City {
@@ -350,6 +373,7 @@ function geocodeResultToCity(r: GeocodeResult): City {
     country: r.country ?? '',
     latitude: r.latitude,
     longitude: r.longitude,
+    population: r.population,
   }
 }
 
@@ -364,29 +388,81 @@ type ReverseGeocodeResult = {
   countryName?: string
 }
 
+// Great-circle distance in km, used to pick the nearest candidate place.
+function distanceKm(aLat: number, aLon: number, bLat: number, bLon: number): number {
+  const R = 6371
+  const rad = (x: number) => (x * Math.PI) / 180
+  const dLat = rad(bLat - aLat)
+  const dLon = rad(bLon - aLon)
+  const h = Math.sin(dLat / 2) ** 2
+    + Math.cos(rad(aLat)) * Math.cos(rad(bLat)) * Math.sin(dLon / 2) ** 2
+  return 2 * R * Math.asin(Math.sqrt(h))
+}
+
+// A candidate must be a real settlement within this radius of the fix.
+const NEAREST_PLACE_MAX_KM = 50
+
 async function reverseGeocode(
   latitude: number,
   longitude: number,
-): Promise<{ name: string; admin1: string; country: string }> {
+): Promise<{ name: string; admin1: string; country: string; id?: number }> {
   const empty = { name: '', admin1: '', country: '' }
   const lang = getLocale()
   const url = 'https://api.bigdatacloud.net/data/reverse-geocode-client'
     + `?latitude=${latitude}&longitude=${longitude}&localityLanguage=${lang}`
+
+  let data: ReverseGeocodeResult
   try {
     const res = await fetch(url)
     if (!res.ok) return empty
-    const data = (await res.json()) as ReverseGeocodeResult
-    // city is empty outside built-up areas; locality then principalSubdivision
-    // are progressively coarser fallbacks so remote fixes still get a label.
-    const name = data.city || data.locality || data.principalSubdivision || ''
-    return {
-      name,
-      // Avoid "Lisbon, Lisbon" when the subdivision repeats the city name.
-      admin1: data.principalSubdivision && data.principalSubdivision !== name ? data.principalSubdivision : '',
-      country: data.countryName ?? '',
-    }
+    data = (await res.json()) as ReverseGeocodeResult
   } catch {
     return empty
+  }
+
+  const country = data.countryName ?? ''
+  const fallbackName = data.city || data.locality || data.principalSubdivision || ''
+
+  // Neither BigDataCloud field is reliably "the place you are in": `city` is
+  // the municipality (Seixal when you are in Corroios) and `locality` is a
+  // sub-city district (City of Westminster for London, Saint-Merri for Paris).
+  // Resolving both against Open-Meteo and taking the nearest *populated* place
+  // picks correctly in every case tested, and has the added benefit that a
+  // GPS-detected place is named identically to one the user searched for,
+  // since both then come from the same database.
+  const candidates = [...new Set([data.locality, data.city].filter(Boolean))] as string[]
+  let best: { city: City; km: number } | null = null
+
+  for (const candidate of candidates) {
+    const results = await searchCities(candidate).catch(() => [] as City[])
+    for (const place of results) {
+      const km = distanceKm(latitude, longitude, place.latitude, place.longitude)
+      if (km > NEAREST_PLACE_MAX_KM) continue
+      // Population 0 marks parishes and quarters, which can sit fractionally
+      // nearer than the city containing them — Saint-Merri beats Paris by
+      // 100m otherwise.
+      if (!place.population) continue
+      if (!best || km < best.km) best = { city: place, km }
+    }
+  }
+
+  if (best) {
+    return {
+      name: best.city.name,
+      admin1: best.city.admin1,
+      country: best.city.country || country,
+      id: best.city.id,
+    }
+  }
+
+  // Nothing populated nearby (mid-ocean, desert, or the geocoder is down):
+  // keep BigDataCloud's answer rather than showing an unnamed entry.
+  return {
+    name: fallbackName,
+    admin1: data.principalSubdivision && data.principalSubdivision !== fallbackName
+      ? data.principalSubdivision
+      : '',
+    country,
   }
 }
 
@@ -396,17 +472,27 @@ async function reverseGeocode(
 //
 // Concurrent callers share one in-flight request — initApp and the first
 // foreground-enter can otherwise fire together and request two fixes.
-// Resolves true when the position actually moved (at the 4dp precision used
-// for city keys, ~10m), so callers can skip a pointless weather refetch and
-// repaint when the fix comes back to the same place.
+// Resolves true when anything the user would see has changed, so callers can
+// skip a pointless weather refetch and repaint when the fix comes back to the
+// same place under the same name.
+//
+// The comparison deliberately includes the resolved name, not just the
+// coordinates. The glasses header renders the name captured at fetch time, so
+// a name that changes while the position does not — a stored fix resolved by
+// older logic, a first successful geocode after failures, a locale switch —
+// still has to trigger a repaint or the glasses keep showing the stale name
+// while the phone list shows the new one.
+function locationSignature(): string {
+  if (!cachedLocation) return ''
+  return `${cachedLocation.latitude.toFixed(4)},${cachedLocation.longitude.toFixed(4)}|${cachedLocation.name}`
+}
+
 export function refreshCurrentLocation(): Promise<boolean> {
   if (locatingInFlight) return locatingInFlight
   locatingInFlight = (async () => {
     const b = getBridge()
     if (!b) return false
-    const before = cachedLocation
-      ? `${cachedLocation.latitude.toFixed(4)},${cachedLocation.longitude.toFixed(4)}`
-      : ''
+    const before = locationSignature()
     try {
       // Medium accuracy is plenty for weather — it resolves to the right
       // locality without demanding a high-precision GPS lock, which is slower
@@ -428,12 +514,17 @@ export function refreshCurrentLocation(): Promise<boolean> {
         admin1: place.admin1 || (place.name ? '' : cachedLocation?.admin1 ?? ''),
         country: place.country || (place.name ? '' : cachedLocation?.country ?? ''),
         updatedAt: Date.now(),
+        id: place.id,
       }
       locationIsStale = false
       await persistCurrentLocation()
-      const after = `${cachedLocation.latitude.toFixed(4)},${cachedLocation.longitude.toFixed(4)}`
-      appendEventLog(`Location: ${cachedLocation.name || 'unnamed'} ${fix.latitude.toFixed(3)},${fix.longitude.toFixed(3)}${before && before === after ? ' (unchanged)' : ''}`)
-      return after !== before
+      const after = locationSignature()
+      const changed = after !== before
+      appendEventLog(
+        `Location: ${cachedLocation.name || 'unnamed'} ${fix.latitude.toFixed(3)},${fix.longitude.toFixed(3)}`
+        + (changed ? '' : ' (unchanged)'),
+      )
+      return changed
     } catch (err) {
       locationIsStale = true
       appendEventLog(`Location: failed (${err instanceof Error ? err.message : String(err)})`)
@@ -509,9 +600,27 @@ export async function setActiveLocale(locale: Locale): Promise<void> {
 // coordinates rather than requesting a new fix.
 async function relocalizeCurrentLocation(): Promise<void> {
   if (!cachedLocation) return
+
+  // Prefer the by-id path when the fix resolved to an Open-Meteo place: it
+  // round-trips across scripts reliably and avoids re-running the whole
+  // nearest-place search just to change language.
+  if (typeof cachedLocation.id === 'number') {
+    const resolved = await fetchCityById(cachedLocation.id, getLocale()).catch(() => null)
+    if (resolved) {
+      cachedLocation = {
+        ...cachedLocation,
+        name: resolved.name,
+        admin1: resolved.admin1,
+        country: resolved.country,
+      }
+      await persistCurrentLocation()
+      return
+    }
+  }
+
   const place = await reverseGeocode(cachedLocation.latitude, cachedLocation.longitude)
   if (!place.name) return
-  cachedLocation = { ...cachedLocation, ...place }
+  cachedLocation = { ...cachedLocation, name: place.name, admin1: place.admin1, country: place.country, id: place.id }
   await persistCurrentLocation()
 }
 

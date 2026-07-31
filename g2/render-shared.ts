@@ -6,13 +6,14 @@
 import {
   CreateStartUpPageContainer,
   ImageRawDataUpdate,
+  ImageRawDataUpdateResult,
   RebuildPageContainer,
   StartUpPageCreateResult,
   type ImageContainerProperty,
   type ListContainerProperty,
   type TextContainerProperty,
 } from '@evenrealities/even_hub_sdk'
-import { appendEventLog } from '../_shared/log'
+import { appendEventLog, debugLog } from '../_shared/log'
 import { getPrecipUnit, getPressureUnit, getTimeUnit, getWindUnit } from './api'
 import { t, tArr } from './i18n'
 import { canvasToBytes } from './icons'
@@ -63,12 +64,16 @@ export async function rebuildPage(config: {
     // against a page that had never been created.
     state.startupRendered = ok
     if (!ok) state.activeContainerIds = new Set()
+    // Startup happens once per session and a failure explains everything that
+    // follows, so this one is always logged.
     appendEventLog(`Page startup -> ${String(result)} in ${Math.round(performance.now() - started)}ms`)
     return
   }
 
   const ok = await b.rebuildPageContainer(new RebuildPageContainer(config))
-  appendEventLog(`Page rebuild -> ${ok ? 'ok' : 'REJECTED'} in ${Math.round(performance.now() - started)}ms`)
+  const line = `Page rebuild -> ${ok ? 'ok' : 'REJECTED'} in ${Math.round(performance.now() - started)}ms`
+  if (ok) debugLog(line)
+  else appendEventLog(line)
   if (!ok) {
     // Skip the image sends rather than firing them at containers that were
     // never built; they would fail one by one and bury the real cause.
@@ -96,10 +101,13 @@ export async function sendImage(bytes: number[], containerID: number, containerN
     new ImageRawDataUpdate({ containerID, containerName, imageData: bytes }),
   )
   const ms = Math.round(performance.now() - started)
-  appendEventLog(
-    `Image ${containerName}#${containerID} ${d ? `${d.w}x${d.h}` : '?'}`
-    + ` ${bytes.length}B png / ${gray4}B gray4 -> ${String(result)} in ${ms}ms`,
-  )
+  const line = `Image ${containerName}#${containerID} ${d ? `${d.w}x${d.h}` : '?'}`
+    + ` ${bytes.length}B png / ${gray4}B gray4 -> ${String(result)} in ${ms}ms`
+  // Successes are one to four lines per screen change — noise in a bug report.
+  // Failures always surface, since a missing image is exactly what a user
+  // would be reporting.
+  if (ImageRawDataUpdateResult.isSuccess(result)) debugLog(line)
+  else appendEventLog(line)
 }
 
 // Note: replacing the full page rebuild with in-place textContainerUpgrade

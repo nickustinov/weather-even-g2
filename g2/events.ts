@@ -1,5 +1,5 @@
 import { OsEventTypeList, type EvenHubEvent } from '@evenrealities/even_hub_sdk'
-import { appendEventLog } from '../_shared/log'
+import { appendEventLog, debugLog } from '../_shared/log'
 import { getBridge, state } from './state'
 import { showScreen, nextScreen, prevScreen, showCityPickerScreen } from './renderer'
 import { onForegroundEnter, onForegroundExit, onAppExit, refreshWeather } from './app'
@@ -108,7 +108,7 @@ function dispatch(event: EvenHubEvent): Promise<void> | void {
       // the current-location entry is permanent, so the old "at least one
       // saved city" guard could no longer be false. With a single entry it
       // doubles as a "refresh this city" affordance (tap it to re-fetch).
-      appendEventLog(`Click: cities=${getCities().length} → open picker`)
+      debugLog(`Click: cities=${getCities().length} → open picker`)
       return showCityPickerScreen()
     }
     if (type === OsEventTypeList.DOUBLE_CLICK_EVENT) {
@@ -124,10 +124,10 @@ function dispatch(event: EvenHubEvent): Promise<void> | void {
 
 export function onEvenHubEvent(event: EvenHubEvent): void {
   if (processing) {
-    appendEventLog(`Event dropped (busy) screen=${state.screen} modal=${state.modal ?? '-'}`)
+    debugLog(`Event dropped (busy) screen=${state.screen} modal=${state.modal ?? '-'}`)
     return
   }
-  appendEventLog(`Event screen=${state.screen} modal=${state.modal ?? '-'}`)
+  debugLog(`Event screen=${state.screen} modal=${state.modal ?? '-'}`)
 
   const result = dispatch(event)
   if (result instanceof Promise) {

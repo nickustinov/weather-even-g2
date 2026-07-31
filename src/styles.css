@@ -138,6 +138,32 @@ a {
   color: var(--color-text);
 }
 
+.log-actions {
+  display: flex;
+  gap: var(--spacing-same);
+  margin-top: var(--spacing-card-margin);
+}
+
+.log-actions button {
+  flex: 1;
+  /* 44px is the minimum comfortable touch target; these sit inside a
+     collapsed panel on a phone, so they need to be tappable, not tiny. */
+  min-height: 44px;
+  padding: 0 var(--spacing-card-margin);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-input-bg);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.85em;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.log-actions button:active {
+  opacity: 0.6;
+}
+
 #event-log {
   margin-top: var(--spacing-card-margin);
   padding: var(--spacing-card-margin);

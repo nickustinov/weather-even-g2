@@ -38,6 +38,10 @@ export type City = {
   // `language` param when the user switches locale — reliable across scripts.
   // Optional: cities saved before id was tracked fall back to name search.
   id?: number
+  // Open-Meteo's population figure. Only used to tell real settlements from
+  // parishes and quarters (which report 0) when resolving a GPS fix to the
+  // nearest place; not displayed.
+  population?: number
   // Marks the synthesized GPS entry. Saved cities are identified by their
   // coordinates (see cityKey), but this entry's coordinates change every time
   // the device is located, so it carries a fixed identity instead. It is never
