@@ -19,7 +19,10 @@
     "about_title": "Weather for Even G2",
     "about_description": "Glanceable weather on your glasses — current conditions, hourly forecast, 10-day outlook, air quality, sun and moon. Multiple cities, your units, your language.",
     "about_data": "Forecast data from Open-Meteo — free, open, no API key.",
-    "about_by": "By Nick Ustinov · "
+    "about_by": "By Nick Ustinov · ",
+    "location_current": "Current location",
+    "location_last_known": "Last known location",
+    "location_unavailable": "Location unavailable"
   },
   "screen_label": {
     "today": "Today",
@@ -73,7 +76,8 @@
     "unit_d": "d",
     "unit_km": "km",
     "minutes": "{m}m",
-    "hours_minutes": "{h}h {m}m"
+    "hours_minutes": "{h}h {m}m",
+    "location_unavailable": "location unavailable"
   },
   "wmo_long": {
     "clear": "clear sky",

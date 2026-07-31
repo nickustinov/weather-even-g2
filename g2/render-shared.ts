@@ -7,6 +7,7 @@ import {
   CreateStartUpPageContainer,
   ImageRawDataUpdate,
   RebuildPageContainer,
+  StartUpPageCreateResult,
   type ImageContainerProperty,
   type ListContainerProperty,
   type TextContainerProperty,
@@ -41,12 +42,38 @@ export async function rebuildPage(config: {
   for (const l of config.listObject ?? []) if (l.containerID !== undefined) next.add(l.containerID)
   state.activeContainerIds = next
 
+  const dims = new Map<number, { w: number; h: number }>()
+  for (const i of config.imageObject ?? []) {
+    if (i.containerID === undefined) continue
+    dims.set(i.containerID, { w: i.width ?? 0, h: i.height ?? 0 })
+  }
+  state.imageContainerDims = dims
+
+  // Both host calls report whether the page was actually built, and both
+  // results used to be discarded. A rejected page leaves no containers, so
+  // every following sendImage fails with nothing to explain why — which is
+  // exactly the shape of "images die after the system exit dialog".
+  const started = performance.now()
+
   if (!state.startupRendered) {
-    await b.createStartUpPageContainer(new CreateStartUpPageContainer(config))
-    state.startupRendered = true
+    const result = await b.createStartUpPageContainer(new CreateStartUpPageContainer(config))
+    const ok = result === StartUpPageCreateResult.success
+    // Only latch on success. Setting this unconditionally meant a failed
+    // startup permanently routed every later render down the rebuild path,
+    // against a page that had never been created.
+    state.startupRendered = ok
+    if (!ok) state.activeContainerIds = new Set()
+    appendEventLog(`Page startup -> ${String(result)} in ${Math.round(performance.now() - started)}ms`)
     return
   }
-  await b.rebuildPageContainer(new RebuildPageContainer(config))
+
+  const ok = await b.rebuildPageContainer(new RebuildPageContainer(config))
+  appendEventLog(`Page rebuild -> ${ok ? 'ok' : 'REJECTED'} in ${Math.round(performance.now() - started)}ms`)
+  if (!ok) {
+    // Skip the image sends rather than firing them at containers that were
+    // never built; they would fail one by one and bury the real cause.
+    state.activeContainerIds = new Set()
+  }
 }
 
 export async function sendImage(bytes: number[], containerID: number, containerName: string): Promise<void> {
@@ -58,11 +85,28 @@ export async function sendImage(bytes: number[], containerID: number, containerN
     // simulator with no visual effect on the glasses.
     return
   }
+  // Transfer time tracks the 4-bit greyscale buffer the host expands our PNG
+  // into and pushes over BLE (w*h/2 bytes), not the PNG size — so log both.
+  // If LZ4 is active on that leg, ms should fall well below what the gray4
+  // figure would otherwise cost.
+  const d = state.imageContainerDims.get(containerID)
+  const gray4 = d ? Math.ceil((d.w * d.h) / 2) : 0
+  const started = performance.now()
   const result = await b.updateImageRawData(
     new ImageRawDataUpdate({ containerID, containerName, imageData: bytes }),
   )
-  appendEventLog(`Image: ${String(result)}`)
+  const ms = Math.round(performance.now() - started)
+  appendEventLog(
+    `Image ${containerName}#${containerID} ${d ? `${d.w}x${d.h}` : '?'}`
+    + ` ${bytes.length}B png / ${gray4}B gray4 -> ${String(result)} in ${ms}ms`,
+  )
 }
+
+// Note: replacing the full page rebuild with in-place textContainerUpgrade
+// calls on the six same-layout chart screens was measured and rejected.
+// textContainerUpgrade costs ~83ms per call against ~165ms for a whole page
+// rebuild, so break-even is 2 containers and a chart screen needs 5-6. The
+// host's per-call overhead, not the payload, is the floor here.
 
 // ---------------------------------------------------------------------------
 // Image rendering helpers

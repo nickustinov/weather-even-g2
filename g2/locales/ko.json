@@ -19,7 +19,10 @@
     "about_title": "Weather for Even G2",
     "about_description": "안경에서 한눈에 보는 날씨 — 현재 상태, 시간별 예보, 10일 예보, 공기질, 해와 달. 여러 도시, 원하는 단위, 원하는 언어.",
     "about_data": "예보 데이터는 Open-Meteo 제공 — 무료, 오픈, API 키 불필요.",
-    "about_by": "제작: Nick Ustinov · "
+    "about_by": "제작: Nick Ustinov · ",
+    "location_current": "현재 위치",
+    "location_last_known": "마지막으로 확인된 위치",
+    "location_unavailable": "위치를 사용할 수 없음"
   },
   "screen_label": {
     "today": "오늘",
@@ -73,7 +76,8 @@
     "unit_d": "일",
     "unit_km": "km",
     "minutes": "{m}분",
-    "hours_minutes": "{h}시 {m}분"
+    "hours_minutes": "{h}시 {m}분",
+    "location_unavailable": "위치를 사용할 수 없음"
   },
   "wmo_long": {
     "clear": "맑음",

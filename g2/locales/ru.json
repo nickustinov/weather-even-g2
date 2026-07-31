@@ -19,7 +19,10 @@
     "about_title": "Weather для Even G2",
     "about_description": "Погода прямо в очках — текущие условия, почасовой прогноз, прогноз на 10 дней, качество воздуха, солнце и луна. Несколько городов, ваши единицы, ваш язык.",
     "about_data": "Данные прогноза от Open-Meteo — свободно, открыто, без API-ключа.",
-    "about_by": "Автор: Nick Ustinov · "
+    "about_by": "Автор: Nick Ustinov · ",
+    "location_current": "Текущее местоположение",
+    "location_last_known": "Последнее известное местоположение",
+    "location_unavailable": "Местоположение недоступно"
   },
   "screen_label": {
     "today": "Сегодня",
@@ -73,7 +76,8 @@
     "unit_d": "д",
     "unit_km": "км",
     "minutes": "{m}м",
-    "hours_minutes": "{h}ч {m}м"
+    "hours_minutes": "{h}ч {m}м",
+    "location_unavailable": "местоположение недоступно"
   },
   "wmo_long": {
     "clear": "ясно",

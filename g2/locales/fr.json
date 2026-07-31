@@ -19,7 +19,10 @@
     "about_title": "Weather pour Even G2",
     "about_description": "Météo en un coup d'œil sur vos lunettes — conditions actuelles, prévisions horaires, prévisions à 10 jours, qualité de l'air, soleil et lune. Plusieurs villes, vos unités, votre langue.",
     "about_data": "Données de prévision d'Open-Meteo — libres, ouvertes, sans clé API.",
-    "about_by": "Par Nick Ustinov · "
+    "about_by": "Par Nick Ustinov · ",
+    "location_current": "Position actuelle",
+    "location_last_known": "Dernière position connue",
+    "location_unavailable": "Position indisponible"
   },
   "screen_label": {
     "today": "Aujourd'hui",
@@ -73,7 +76,8 @@
     "unit_d": "j",
     "unit_km": "km",
     "minutes": "{m}m",
-    "hours_minutes": "{h}h {m}m"
+    "hours_minutes": "{h}h {m}m",
+    "location_unavailable": "position indisponible"
   },
   "wmo_long": {
     "clear": "ciel dégagé",

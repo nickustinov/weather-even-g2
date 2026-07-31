@@ -19,7 +19,10 @@
     "about_title": "Weather voor Even G2",
     "about_description": "Weer in één oogopslag op je bril — huidige omstandigheden, uurprognose, 10-daagse vooruitzichten, luchtkwaliteit, zon en maan. Meerdere steden, je eenheden, je taal.",
     "about_data": "Weergegevens van Open-Meteo — gratis, open, geen API-sleutel.",
-    "about_by": "Door Nick Ustinov · "
+    "about_by": "Door Nick Ustinov · ",
+    "location_current": "Huidige locatie",
+    "location_last_known": "Laatst bekende locatie",
+    "location_unavailable": "Locatie niet beschikbaar"
   },
   "screen_label": {
     "today": "Vandaag",
@@ -73,7 +76,8 @@
     "unit_d": "d",
     "unit_km": "km",
     "minutes": "{m}m",
-    "hours_minutes": "{h}u {m}m"
+    "hours_minutes": "{h}u {m}m",
+    "location_unavailable": "locatie niet beschikbaar"
   },
   "wmo_long": {
     "clear": "heldere hemel",

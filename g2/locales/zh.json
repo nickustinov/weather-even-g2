@@ -19,7 +19,10 @@
     "about_title": "Weather for Even G2",
     "about_description": "在眼镜上一目了然的天气 — 当前状况、逐小时预报、10天展望、空气质量、日月。多个城市、您的单位、您的语言。",
     "about_data": "天气数据来自 Open-Meteo — 免费、开放、无需 API 密钥。",
-    "about_by": "作者: Nick Ustinov · "
+    "about_by": "作者: Nick Ustinov · ",
+    "location_current": "当前位置",
+    "location_last_known": "上次已知位置",
+    "location_unavailable": "无法获取位置"
   },
   "screen_label": {
     "today": "今天",
@@ -73,7 +76,8 @@
     "unit_d": "天",
     "unit_km": "km",
     "minutes": "{m}分",
-    "hours_minutes": "{h}时{m}分"
+    "hours_minutes": "{h}时{m}分",
+    "location_unavailable": "无法获取位置"
   },
   "wmo_long": {
     "clear": "晴朗",

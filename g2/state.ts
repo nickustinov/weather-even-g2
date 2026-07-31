@@ -38,6 +38,12 @@ export type City = {
   // `language` param when the user switches locale — reliable across scripts.
   // Optional: cities saved before id was tracked fall back to name search.
   id?: number
+  // Marks the synthesized GPS entry. Saved cities are identified by their
+  // coordinates (see cityKey), but this entry's coordinates change every time
+  // the device is located, so it carries a fixed identity instead. It is never
+  // stored in the saved-cities list — api.ts prepends it on read, which is what
+  // makes it impossible to delete or reorder.
+  kind?: 'current'
 }
 
 export type HourlyPoint = {
@@ -129,6 +135,10 @@ export type State = {
   // so that any sendImage call queued from a previous render is dropped
   // instead of targeting a no-longer-existing container.
   activeContainerIds: Set<number>
+  // Declared geometry of each image container on the current page. Lets
+  // sendImage report the gray4 buffer size the host has to push over BLE,
+  // which is the figure transfer time actually tracks — not our PNG size.
+  imageContainerDims: Map<number, { w: number; h: number }>
 }
 
 export const state: State = {
@@ -138,6 +148,7 @@ export const state: State = {
   weather: null,
   modal: null,
   activeContainerIds: new Set(),
+  imageContainerDims: new Map(),
 }
 
 let _bridge: EvenAppBridge | null = null

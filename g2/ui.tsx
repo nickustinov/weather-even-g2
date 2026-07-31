@@ -6,6 +6,7 @@ import { Select } from 'even-toolkit/web/select'
 import {
   searchCities, onSettingsLoaded,
   getCities, getActiveCity, cityKey, addCity, removeCity, setActiveCity, setCities, onCitiesChanged,
+  isCurrentLocationStale,
   getScreenPrefs, saveScreenPrefs, onScreenPrefsChanged,
   getUnitPrefs, setUnitPrefs, onUnitPrefsChanged,
   getActiveLocale, setActiveLocale, onLocaleChanged,
@@ -14,10 +15,6 @@ import { refreshWeather } from './app'
 import { LOCALE_LABELS, SUPPORTED_LOCALES, t, type Locale } from './i18n'
 import type { City, ScreenPref, UnitPrefs } from './state'
 import appManifest from '../app.json'
-
-function autoConnect() {
-  document.getElementById('connectBtn')?.click()
-}
 
 function cityLabel(city: City): string {
   const parts = [city.name]
@@ -33,6 +30,20 @@ const cityRowStyle: React.CSSProperties = {
   padding: '10px 12px',
   background: 'var(--color-surface)',
   borderRadius: 'var(--radius-default)',
+}
+
+// Shared by the draggable city rows and by the hidden spacer on the pinned
+// current-location row, so both reserve identical width and the radio buttons
+// line up down the column.
+const dragHandleStyle: React.CSSProperties = {
+  color: 'var(--color-text-dim)',
+  fontSize: 18,
+  lineHeight: 1,
+  userSelect: 'none',
+  WebkitUserSelect: 'none',
+  touchAction: 'none',
+  padding: '6px 4px',
+  flexShrink: 0,
 }
 
 const iconBtnStyle: React.CSSProperties = {
@@ -102,7 +113,9 @@ function CitiesEditor() {
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   useEffect(() => {
-    if (active) autoConnect()
+    // No connect call here: src/main.ts already auto-connects unconditionally
+    // on page load. Doing it again from this effect started a second, parallel
+    // init whose image sends interleaved with the first's.
     const sync = () => {
       setCitiesState(getCities())
       setActive(getActiveCity())
@@ -127,12 +140,18 @@ function CitiesEditor() {
     return originalInsert > fromIndex ? originalInsert - 1 : originalInsert
   }
 
+  // Reorder operates on the saved cities only. The GPS entry is rendered
+  // separately above the list and never enters `saved`, so its position is
+  // fixed and the drag indices stay aligned with what setCities persists.
+  const saved = cities.filter(c => c.kind !== 'current')
+  const current = cities.find(c => c.kind === 'current') ?? null
+
   const move = (from: number, to: number) => {
-    if (from === to || from < 0 || to < 0 || from >= cities.length || to >= cities.length) return
-    const next = cities.slice()
+    if (from === to || from < 0 || to < 0 || from >= saved.length || to >= saved.length) return
+    const next = saved.slice()
     const [moved] = next.splice(from, 1)
     next.splice(to, 0, moved)
-    setCitiesState(next)
+    setCitiesState([...(current ? [current] : []), ...next])
     void setCities(next)
   }
 
@@ -153,10 +172,9 @@ function CitiesEditor() {
     const inputEl = document.getElementById('city-search') as HTMLInputElement | null
     inputEl?.blur()
     await addCity(city)
-    // Note: deliberately NOT calling autoConnect() here. The bridge is
-    // already connected from the initial useEffect; clicking #connectBtn
-    // again triggers a fresh SDK connect flow that has been observed to
-    // lock browser-side page scrolling on the Even webview.
+    // Deliberately no reconnect here — the bridge is already connected from
+    // boot. Re-triggering the SDK connect flow has been observed to lock
+    // browser-side page scrolling on the Even webview.
     void refreshWeather()
   }
 
@@ -173,17 +191,47 @@ function CitiesEditor() {
   }
 
   // Filter out cities already saved from the search results.
-  const savedKeys = new Set(cities.map(cityKey))
+  const savedKeys = new Set(saved.map(cityKey))
   const filteredResults = results.filter(r => !savedKeys.has(cityKey(r)))
+
+  const currentIsActive = !!active && !!current && cityKey(active) === cityKey(current)
+  const currentLabel = current && current.name
+    ? cityLabel(current)
+    : t('browser.location_unavailable')
 
   return (
     <div className="weather-card">
-      {cities.length > 0 && (
+      {current && (
+        <div
+          style={{ ...cityRowStyle, marginBottom: saved.length > 0 ? 6 : 'var(--spacing-cross)' }}
+        >
+          {/* No drag handle and no remove button: this entry is permanent.
+              A hidden copy of the handle reserves the column instead of a
+              fixed width, so the radio lines up with the draggable rows
+              exactly rather than approximately. */}
+          <span aria-hidden="true" style={{ ...dragHandleStyle, visibility: 'hidden' }}>⋮⋮</span>
+          <ActiveRadio active={currentIsActive} onSelect={() => handleSelect(current)} />
+          <span
+            className="text-medium-body"
+            style={{ flex: 1, color: 'var(--color-text)', cursor: 'pointer' }}
+            onClick={() => handleSelect(current)}
+          >
+            ⌖ {currentLabel}
+            <span style={{ display: 'block', color: 'var(--color-text-dim)', fontSize: '0.78em' }}>
+              {isCurrentLocationStale()
+                ? t('browser.location_last_known')
+                : t('browser.location_current')}
+            </span>
+          </span>
+        </div>
+      )}
+
+      {saved.length > 0 && (
         <ul
           ref={listRef}
           style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 'var(--spacing-cross)' }}
         >
-          {cities.map((city, index) => {
+          {saved.map((city, index) => {
             const key = cityKey(city)
             const isActive = !!active && cityKey(active) === key
             const isDragging = dragKey === key
@@ -231,17 +279,7 @@ function CitiesEditor() {
                     setDragOffsetY(0)
                   }}
                   aria-label={t('browser.drag_city', { city: cityLabel(city) })}
-                  style={{
-                    color: 'var(--color-text-dim)',
-                    fontSize: 18,
-                    lineHeight: 1,
-                    userSelect: 'none',
-                    WebkitUserSelect: 'none',
-                    touchAction: 'none',
-                    cursor: dragKey === key ? 'grabbing' : 'grab',
-                    padding: '6px 4px',
-                    flexShrink: 0,
-                  }}
+                  style={{ ...dragHandleStyle, cursor: dragKey === key ? 'grabbing' : 'grab' }}
                 >
                   ⋮⋮
                 </span>
@@ -270,7 +308,7 @@ function CitiesEditor() {
         id="city-search"
         value={query}
         onChange={handleSearchChange}
-        placeholder={cities.length === 0 ? t('browser.search_first') : t('browser.search_more')}
+        placeholder={saved.length === 0 ? t('browser.search_first') : t('browser.search_more')}
         autoComplete="off"
         autoCorrect="off"
         autoCapitalize="off"

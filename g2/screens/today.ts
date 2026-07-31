@@ -13,15 +13,15 @@ import {
   displayTime,
   formatPressure,
   rebuildPage,
-  renderDottedNumberBytes,
-  renderWeatherIconBytes,
   sendImage,
   speedUnit,
   todayDateString,
   windLabel,
 } from '../render-shared'
 import type { DotTextOpts } from '../dot-digits'
-import { measureDotted } from '../dot-digits'
+import { drawDotted, measureDotted } from '../dot-digits'
+import { canvasToBytes } from '../icons'
+import { drawWeatherIcon } from '../weather-icons'
 
 const TODAY_PAD = 8
 const TODAY_HEADER_Y = 0
@@ -51,6 +51,18 @@ const TODAY_STAT_VALUE_W = TODAY_RIGHT_W - TODAY_STAT_LABEL_W
 
 const TODAY_CONDITION_ICON_SIZE = 58
 
+// The condition icon is composited into the headline canvas rather than given
+// its own container. Every updateImageRawData call costs ~104ms of fixed
+// overhead on hardware regardless of payload size, so a single 281x141 send
+// beats a 272x130 plus a 58x58 — the extra ~450 bytes of gray4 cost about 2ms.
+//
+// Dimensions are the worst case over all temperatures ("100°" pushes the icon
+// furthest right, and the icon hangs ~11px below the text box). Both stay
+// inside the 288x144 image-container limit, clear of the stats column at
+// x=296 and of the range row below.
+const TODAY_HEADLINE_W = 281
+const TODAY_HEADLINE_H = 141
+
 // Today's headline is slightly larger than the chart screens but still fixed
 // so swiping between values doesn't rescale. d=3 macro cell = 11px, '100°'
 // renders at ~245px which fits the 260px content area.
@@ -67,7 +79,7 @@ function todayDegreePosition(temp: number): { x: number; y: number } {
   const prefix = text.slice(0, -1)
   const prefixWidth = measureDotted(prefix, TODAY_HEADLINE_OPTS).width
   const measured = measureDotted(text, TODAY_HEADLINE_OPTS)
-  // renderDottedNumberBytes draws at x=4 inside the temp canvas, vertically
+  // The headline is drawn at x=4 inside the temp canvas, vertically
   // centered. Icon sits below the visible glyph bounds.
   const yOffset = Math.floor((TODAY_TEMP_H - measured.height) / 2)
   // 3-char temps ("105", "-12") push the icon past the right-side stats
@@ -77,6 +89,37 @@ function todayDegreePosition(temp: number): { x: number; y: number } {
     x: TODAY_TEMP_X + 4 + prefixWidth + charGap + 14 + wideAdjust,
     y: TODAY_TEMP_Y + yOffset + measured.height - 23,
   }
+}
+
+// Draws the big dotted temperature and the condition icon onto one canvas.
+// Content is positioned using the ORIGINAL 272x130 text box rather than the
+// enlarged canvas, so nothing moves on screen relative to the two-container
+// version — the canvas only grew to cover where the icon already sat.
+async function renderTodayHeadlineBytes(text: string, wmoCode: number, isDay: boolean): Promise<number[]> {
+  const canvas = document.createElement('canvas')
+  canvas.width = TODAY_HEADLINE_W
+  canvas.height = TODAY_HEADLINE_H
+  const ctx = canvas.getContext('2d')!
+  ctx.fillStyle = '#000'
+  ctx.fillRect(0, 0, TODAY_HEADLINE_W, TODAY_HEADLINE_H)
+
+  const m = measureDotted(text, TODAY_HEADLINE_OPTS)
+  ctx.fillStyle = '#999'
+  drawDotted(ctx, text, 4, Math.floor((TODAY_TEMP_H - m.height) / 2), TODAY_HEADLINE_OPTS)
+
+  // Same absolute position as the old standalone container, expressed
+  // relative to the canvas origin.
+  const { x, y } = todayDegreePosition(Number(text.replace('°', '')))
+  const half = TODAY_CONDITION_ICON_SIZE / 2
+  await drawWeatherIcon(
+    ctx,
+    wmoCode,
+    x - TODAY_TEMP_X + half,
+    y - TODAY_TEMP_Y + half,
+    TODAY_CONDITION_ICON_SIZE,
+    isDay,
+  )
+  return canvasToBytes(canvas)
 }
 
 function todayHeader(w: WeatherData): string {
@@ -118,10 +161,9 @@ export async function showTodayScreen(w: WeatherData): Promise<void> {
   if (!today) return
 
   const headlineText = `${w.currentTemp}°`
-  const { x: conditionIconX, y: conditionIconY } = todayDegreePosition(w.currentTemp)
 
   await rebuildPage({
-    containerTotalNum: 6,
+    containerTotalNum: 5,
     textObject: [
       new TextContainerProperty({
         containerID: 1,
@@ -174,21 +216,16 @@ export async function showTodayScreen(w: WeatherData): Promise<void> {
         containerName: 'headline',
         xPosition: TODAY_TEMP_X,
         yPosition: TODAY_TEMP_Y,
-        width: TODAY_TEMP_W,
-        height: TODAY_TEMP_H,
-      }),
-      new ImageContainerProperty({
-        containerID: 6,
-        containerName: 'condition',
-        xPosition: conditionIconX,
-        yPosition: conditionIconY,
-        width: TODAY_CONDITION_ICON_SIZE,
-        height: TODAY_CONDITION_ICON_SIZE,
+        width: TODAY_HEADLINE_W,
+        height: TODAY_HEADLINE_H,
       }),
     ],
   })
 
-  await sendImage(renderDottedNumberBytes(headlineText, TODAY_TEMP_W, TODAY_TEMP_H, TODAY_HEADLINE_OPTS), 5, 'headline')
-  await sendImage(await renderWeatherIconBytes(w.currentWmoCode, TODAY_CONDITION_ICON_SIZE, w.currentIsDay), 6, 'condition')
+  await sendImage(
+    await renderTodayHeadlineBytes(headlineText, w.currentWmoCode, w.currentIsDay),
+    5,
+    'headline',
+  )
   appendEventLog(`Screen: ${state.screen}`)
 }

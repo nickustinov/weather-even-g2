@@ -1,4 +1,4 @@
-import type { EvenAppBridge } from '@evenrealities/even_hub_sdk'
+import { AppLocationAccuracy, type EvenAppBridge } from '@evenrealities/even_hub_sdk'
 import type {
   AirQuality, AqiScale, City, Pollen, ScreenPref, Screen,
   TempUnit, WindUnit, PrecipUnit, PressureUnit, TimeUnit, UnitPrefs,
@@ -12,6 +12,7 @@ import { detectBrowserLocale, getLocale, setLocaleSync, SUPPORTED_LOCALES, t, tA
 const CITY_KEY = 'weather:city'        // legacy: single-city storage, migrated
 const CITIES_KEY = 'weather:cities'
 const ACTIVE_KEY = 'weather:active-city'
+const CURRENT_LOC_KEY = 'weather:current-location'
 const UNIT_KEY = 'weather:unit'        // legacy: 'metric'|'imperial', migrated
 const UNIT_PREFS_KEY = 'weather:units'
 const SCREENS_KEY = 'weather:screens'
@@ -19,8 +20,29 @@ const LOCALE_KEY = 'weather:locale'
 
 // --- Settings (SDK local storage + memory cache) ---
 
+// Fixed identity of the GPS entry. Persisted as the active-city reference, so
+// it must never collide with a coordinate key (which always contains a comma).
+export const CURRENT_KEY = 'current'
+
+// Last successful fix, persisted so the entry still names a real place when a
+// later launch is denied GPS or gets no fix indoors. `updatedAt` is epoch ms.
+type StoredLocation = {
+  latitude: number
+  longitude: number
+  name: string
+  admin1: string
+  country: string
+  updatedAt: number
+}
+
 let cachedCities: City[] = []
 let cachedActiveKey: string = ''
+let cachedLocation: StoredLocation | null = null
+// Whether the most recent fix attempt this session succeeded. Drives the
+// "showing last known position" hint; deliberately not persisted, since a
+// fresh launch has not attempted a fix yet.
+let locationIsStale = false
+let locatingInFlight: Promise<boolean> | null = null
 let cachedUnitPrefs: UnitPrefs = { ...DEFAULT_UNIT_PREFS }
 let cachedScreenPrefs: ScreenPref[] = DEFAULT_SCREEN_PREFS.slice()
 const settingsListeners: Array<() => void> = []
@@ -32,7 +54,12 @@ const localeListeners: Array<() => void> = []
 // Stable identifier for a city — coordinates uniquely identify a place
 // (two cities sharing a name distinguish themselves by lat/lng) and survive
 // rename quirks in the geocoder.
+//
+// The GPS entry is the exception: its coordinates change on every fix, so a
+// coordinate key would make it look like a different city each launch and
+// break the stored active-city reference. It gets a fixed key instead.
 export function cityKey(city: City): string {
+  if (city.kind === 'current') return CURRENT_KEY
   return `${city.latitude.toFixed(4)},${city.longitude.toFixed(4)}`
 }
 
@@ -47,6 +74,20 @@ export async function loadSettings(b: EvenAppBridge): Promise<void> {
   }
   const rawActive = await b.getLocalStorage(ACTIVE_KEY)
   if (rawActive) cachedActiveKey = rawActive
+
+  const rawLocation = await b.getLocalStorage(CURRENT_LOC_KEY)
+  if (rawLocation) {
+    try {
+      const parsed = JSON.parse(rawLocation) as StoredLocation
+      // Guard against a truncated or hand-edited record producing a 0,0 fetch.
+      if (typeof parsed?.latitude === 'number' && typeof parsed?.longitude === 'number') {
+        cachedLocation = parsed
+        // Nothing has been attempted yet this session, so the remembered fix
+        // is by definition not fresh until refreshCurrentLocation succeeds.
+        locationIsStale = true
+      }
+    } catch { /* ignore */ }
+  }
 
   // Migrate legacy single-city storage if no multi-city list exists yet.
   if (cachedCities.length === 0) {
@@ -63,8 +104,10 @@ export async function loadSettings(b: EvenAppBridge): Promise<void> {
   }
 
   // Ensure active key references a city in the list; otherwise fall back to
-  // the first entry (or stay empty if no cities exist).
-  if (cachedCities.length > 0 && !cachedCities.some(c => cityKey(c) === cachedActiveKey)) {
+  // the first entry (or stay empty if no cities exist). CURRENT_KEY is always
+  // a valid reference — the GPS entry cannot be deleted — so it is exempt.
+  if (cachedActiveKey !== CURRENT_KEY
+    && cachedCities.length > 0 && !cachedCities.some(c => cityKey(c) === cachedActiveKey)) {
     cachedActiveKey = cityKey(cachedCities[0])
     await b.setLocalStorage(ACTIVE_KEY, cachedActiveKey)
   }
@@ -143,11 +186,53 @@ export function onScreenPrefsChanged(cb: () => void): void {
   screenPrefsListeners.push(cb)
 }
 
+// ---------------------------------------------------------------------------
+// Current location
+//
+// The GPS entry is synthesized on read rather than stored in cachedCities.
+// That is what makes it permanent: removeCity and setCities only ever operate
+// on the saved list, so no reorder or delete can reach it, and no guard is
+// needed at each of those call sites.
+// ---------------------------------------------------------------------------
+
+// Always present, so the entry is pinned at the head of the list even before
+// the first ever fix. Without coordinates it is a placeholder: getActiveCity
+// refuses to return it, so it can never drive a weather fetch.
+export function getCurrentLocationCity(): City {
+  if (!cachedLocation) {
+    return { kind: 'current', name: '', admin1: '', country: '', latitude: 0, longitude: 0 }
+  }
+  return {
+    kind: 'current',
+    name: cachedLocation.name,
+    admin1: cachedLocation.admin1,
+    country: cachedLocation.country,
+    latitude: cachedLocation.latitude,
+    longitude: cachedLocation.longitude,
+  }
+}
+
+export function hasCurrentLocationFix(): boolean {
+  return cachedLocation !== null
+}
+
+// True when we are showing a remembered position because the latest attempt
+// failed, so the UI can mark it rather than implying the fix is fresh.
+export function isCurrentLocationStale(): boolean {
+  return locationIsStale && cachedLocation !== null
+}
+
 export function getCities(): City[] {
-  return cachedCities
+  return [getCurrentLocationCity(), ...cachedCities]
 }
 
 export function getActiveCity(): City | null {
+  if (cachedActiveKey === CURRENT_KEY) {
+    // Never hand back the placeholder — a 0,0 fetch would report weather in
+    // the Atlantic. Fall back to the first saved city until a fix arrives.
+    if (cachedLocation) return getCurrentLocationCity()
+    return cachedCities[0] ?? null
+  }
   return cachedCities.find(c => cityKey(c) === cachedActiveKey) ?? null
 }
 
@@ -175,6 +260,9 @@ export async function addCity(city: City): Promise<void> {
 }
 
 export async function removeCity(key: string): Promise<void> {
+  // The GPS entry is not in the saved list, so filtering could never drop it —
+  // but returning early also stops it clearing the active reference.
+  if (key === CURRENT_KEY) return
   const next = cachedCities.filter(c => cityKey(c) !== key)
   cachedCities = next
   if (cachedActiveKey === key) {
@@ -186,17 +274,20 @@ export async function removeCity(key: string): Promise<void> {
 
 // Replace the saved cities list (used by the browser UI drag reorder).
 // Preserves the active key as long as that city is still in the new list.
+// The GPS entry is filtered out defensively: it is pinned and undraggable in
+// the UI, but it must never end up persisted into the saved list, where it
+// would be deletable and would go stale at fixed coordinates.
 export async function setCities(cities: City[]): Promise<void> {
-  cachedCities = cities
-  if (!cities.some(c => cityKey(c) === cachedActiveKey)) {
-    cachedActiveKey = cities.length > 0 ? cityKey(cities[0]) : ''
+  cachedCities = cities.filter(c => c.kind !== 'current')
+  if (cachedActiveKey !== CURRENT_KEY && !cachedCities.some(c => cityKey(c) === cachedActiveKey)) {
+    cachedActiveKey = cachedCities.length > 0 ? cityKey(cachedCities[0]) : ''
   }
   await persistCities()
   for (const cb of citiesListeners) cb()
 }
 
 export async function setActiveCity(key: string): Promise<void> {
-  if (!cachedCities.some(c => cityKey(c) === key)) return
+  if (key !== CURRENT_KEY && !cachedCities.some(c => cityKey(c) === key)) return
   cachedActiveKey = key
   const b = getBridge()
   if (b) await b.setLocalStorage(ACTIVE_KEY, key)
@@ -262,6 +353,111 @@ function geocodeResultToCity(r: GeocodeResult): City {
   }
 }
 
+// Open-Meteo's geocoder is forward-only, so naming a raw fix needs a separate
+// reverse-geocoding service. BigDataCloud's client endpoint is free, needs no
+// API key, and sends CORS headers, which the Even WebView enforces. A failure
+// here is not fatal — the fix is still usable, it just goes unnamed.
+type ReverseGeocodeResult = {
+  city?: string
+  locality?: string
+  principalSubdivision?: string
+  countryName?: string
+}
+
+async function reverseGeocode(
+  latitude: number,
+  longitude: number,
+): Promise<{ name: string; admin1: string; country: string }> {
+  const empty = { name: '', admin1: '', country: '' }
+  const lang = getLocale()
+  const url = 'https://api.bigdatacloud.net/data/reverse-geocode-client'
+    + `?latitude=${latitude}&longitude=${longitude}&localityLanguage=${lang}`
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return empty
+    const data = (await res.json()) as ReverseGeocodeResult
+    // city is empty outside built-up areas; locality then principalSubdivision
+    // are progressively coarser fallbacks so remote fixes still get a label.
+    const name = data.city || data.locality || data.principalSubdivision || ''
+    return {
+      name,
+      // Avoid "Lisbon, Lisbon" when the subdivision repeats the city name.
+      admin1: data.principalSubdivision && data.principalSubdivision !== name ? data.principalSubdivision : '',
+      country: data.countryName ?? '',
+    }
+  } catch {
+    return empty
+  }
+}
+
+// One-shot fix. Deliberately uses getAppLocation rather than
+// startAppLocationUpdates: continuous tracking would keep the GPS radio warm
+// and drain the phone battery, and the app only needs a position per launch.
+//
+// Concurrent callers share one in-flight request — initApp and the first
+// foreground-enter can otherwise fire together and request two fixes.
+// Resolves true when the position actually moved (at the 4dp precision used
+// for city keys, ~10m), so callers can skip a pointless weather refetch and
+// repaint when the fix comes back to the same place.
+export function refreshCurrentLocation(): Promise<boolean> {
+  if (locatingInFlight) return locatingInFlight
+  locatingInFlight = (async () => {
+    const b = getBridge()
+    if (!b) return false
+    const before = cachedLocation
+      ? `${cachedLocation.latitude.toFixed(4)},${cachedLocation.longitude.toFixed(4)}`
+      : ''
+    try {
+      // Medium accuracy is plenty for weather — it resolves to the right
+      // locality without demanding a high-precision GPS lock, which is slower
+      // and costs more battery.
+      const fix = await b.getAppLocation({ accuracy: AppLocationAccuracy.Medium, timeoutMs: 10_000 })
+      if (!fix) {
+        // Denied, timed out, or no signal. Keep whatever we last knew.
+        locationIsStale = true
+        appendEventLog(`Location: no fix${cachedLocation ? ' (using last known)' : ''}`)
+        return false
+      }
+      const place = await reverseGeocode(fix.latitude, fix.longitude)
+      cachedLocation = {
+        latitude: fix.latitude,
+        longitude: fix.longitude,
+        // Keep the previous name if reverse geocoding failed but we have moved
+        // only slightly; an unnamed entry is worse than a marginally stale one.
+        name: place.name || cachedLocation?.name || '',
+        admin1: place.admin1 || (place.name ? '' : cachedLocation?.admin1 ?? ''),
+        country: place.country || (place.name ? '' : cachedLocation?.country ?? ''),
+        updatedAt: Date.now(),
+      }
+      locationIsStale = false
+      await persistCurrentLocation()
+      const after = `${cachedLocation.latitude.toFixed(4)},${cachedLocation.longitude.toFixed(4)}`
+      appendEventLog(`Location: ${cachedLocation.name || 'unnamed'} ${fix.latitude.toFixed(3)},${fix.longitude.toFixed(3)}${before && before === after ? ' (unchanged)' : ''}`)
+      return after !== before
+    } catch (err) {
+      locationIsStale = true
+      appendEventLog(`Location: failed (${err instanceof Error ? err.message : String(err)})`)
+      return false
+    } finally {
+      for (const cb of citiesListeners) cb()
+    }
+  })()
+
+  const pending = locatingInFlight
+  // Clear the shared slot once settled, guarding against a newer request
+  // having already replaced it.
+  void pending.finally(() => {
+    if (locatingInFlight === pending) locatingInFlight = null
+  })
+  return pending
+}
+
+async function persistCurrentLocation(): Promise<void> {
+  const b = getBridge()
+  if (!b || !cachedLocation) return
+  await b.setLocalStorage(CURRENT_LOC_KEY, JSON.stringify(cachedLocation))
+}
+
 export async function searchCities(query: string): Promise<City[]> {
   if (query.length < 2) return []
 
@@ -302,9 +498,21 @@ export async function setActiveLocale(locale: Locale): Promise<void> {
   const b = getBridge()
   if (b) await b.setLocalStorage(LOCALE_KEY, locale)
   await relocalizeSavedCities()
+  await relocalizeCurrentLocation()
   for (const cb of localeListeners) cb()
   // City list also visually depends on locale (names changed).
   for (const cb of citiesListeners) cb()
+}
+
+// The GPS entry's name comes from the reverse geocoder, so a locale switch has
+// to re-resolve it too or it keeps the previous language. Re-uses the stored
+// coordinates rather than requesting a new fix.
+async function relocalizeCurrentLocation(): Promise<void> {
+  if (!cachedLocation) return
+  const place = await reverseGeocode(cachedLocation.latitude, cachedLocation.longitude)
+  if (!place.name) return
+  cachedLocation = { ...cachedLocation, ...place }
+  await persistCurrentLocation()
 }
 
 // Re-resolve each saved city through the geocoder so its name/admin1/country

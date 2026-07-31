@@ -104,13 +104,12 @@ function dispatch(event: EvenHubEvent): Promise<void> | void {
   if (event.sysEvent) {
     const type = event.sysEvent.eventType ?? 0
     if (type === OsEventTypeList.CLICK_EVENT) {
-      // Tap opens the city picker as long as we have at least one city
-      // saved. With one city it doubles as a "refresh current city"
-      // affordance (tap the only city to re-fetch).
-      const n = getCities().length
-      appendEventLog(`Click: cities=${n} → ${n >= 1 ? 'open picker' : 'ignored'}`)
-      if (n >= 1) return showCityPickerScreen()
-      return
+      // Tap always opens the city picker: the list is never empty now that
+      // the current-location entry is permanent, so the old "at least one
+      // saved city" guard could no longer be false. With a single entry it
+      // doubles as a "refresh this city" affordance (tap it to re-fetch).
+      appendEventLog(`Click: cities=${getCities().length} → open picker`)
+      return showCityPickerScreen()
     }
     if (type === OsEventTypeList.DOUBLE_CLICK_EVENT) {
       // Even Hub submission requirement: double-tap on the root screen

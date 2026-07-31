@@ -1,4 +1,5 @@
 import type { AppModule } from '../_shared/app-types'
+import { initLogPanel } from '../_shared/log'
 
 function updateStatus(text: string) {
   console.log(`[ui] ${text}`)
@@ -7,6 +8,7 @@ function updateStatus(text: string) {
 }
 
 async function boot() {
+  initLogPanel()
   const module = await import('../g2/index')
   const app: AppModule = module.app ?? module.default
 
