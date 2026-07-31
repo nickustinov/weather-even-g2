@@ -7,7 +7,7 @@
   "tagline": "Current weather and forecasts on your glasses",
   "author": "nickustinov",
   "entrypoint": "index.html",
-  "min_app_version": "2.2.6",
+  "min_app_version": "2.2.7",
   "min_sdk_version": "0.0.13",
   "supported_languages": ["en", "zh", "es", "fr", "de", "ja", "ko", "it"],
   "permissions": [
