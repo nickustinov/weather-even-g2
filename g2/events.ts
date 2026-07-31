@@ -13,6 +13,26 @@ import { cityKey, getCities, setActiveCity } from './api'
 // same tap landed on the list's "‹ Back" item).
 let processing = false
 
+// Set the moment shutDownPageContainer(1) is requested, cleared when the user
+// answers. While it is set, the foreground events mean something different —
+// see the dispatch comment.
+let exitDialogPending = false
+
+// The firmware emits duplicate sys events for one physical transition, ~50-100ms
+// apart. Deduping them matters most around the exit dialogue, where acting on
+// the second copy would rebuild the page twice or re-arm the wrong branch.
+const SYS_DEDUP_MS = 600
+let lastSysType: number | null = null
+let lastSysAt = 0
+
+function isDuplicateSysEvent(sysType: number): boolean {
+  const now = Date.now()
+  const duplicate = sysType === lastSysType && now - lastSysAt < SYS_DEDUP_MS
+  lastSysType = sysType
+  lastSysAt = now
+  return duplicate
+}
+
 // Per handle-input docs: protobuf strips zero-value fields, so
 // listEvent.currentSelectItemIndex for item 0 arrives as undefined.
 function readListIndex(event: EvenHubEvent): number {
@@ -47,6 +67,51 @@ function dispatch(event: EvenHubEvent): Promise<void> | void {
   // --- Lifecycle (sysEvent, always handled even if not on the active page).
   if (event.sysEvent) {
     const sysType = event.sysEvent.eventType ?? 0
+
+    // Lifecycle events only — clicks and double-clicks also arrive as sysEvent
+    // and are legitimately repeatable.
+    const isLifecycle = sysType === OsEventTypeList.FOREGROUND_ENTER_EVENT
+      || sysType === OsEventTypeList.FOREGROUND_EXIT_EVENT
+      || sysType === OsEventTypeList.ABNORMAL_EXIT_EVENT
+      || sysType === OsEventTypeList.SYSTEM_EXIT_EVENT
+    if (isLifecycle && isDuplicateSysEvent(sysType)) {
+      debugLog(`Lifecycle: duplicate sys event ${sysType} ignored`)
+      return
+    }
+
+    // The exit dialogue inverts the meaning of the foreground events, so they
+    // have to be interpreted differently while one is up. After
+    // shutDownPageContainer(1) the host fires:
+    //   FOREGROUND_ENTER when the dialogue APPEARS, at which point it has
+    //     already cleared the page host-side — this is the cue to rebuild.
+    //   FOREGROUND_EXIT  when the user answers "No" — cancelled, keep running.
+    //   SYSTEM_EXIT      when the user answers "Yes" — really exiting.
+    // Treating that FOREGROUND_EXIT as a background is what left the periodic
+    // refresh stopped after cancelling.
+    if (exitDialogPending) {
+      if (sysType === OsEventTypeList.FOREGROUND_ENTER_EVENT) {
+        // Do NOT rebuild here. Rebuilding while the dialogue is up recreates
+        // the image containers as empty placeholders, and the sends that would
+        // refill them fail behind the modal — so the images are wiped rather
+        // than restored. Wait until the user is actually looking at the app.
+        appendEventLog('Lifecycle: exit dialogue shown')
+        return
+      }
+      if (sysType === OsEventTypeList.FOREGROUND_EXIT_EVENT) {
+        // "No" — the app is visible again. This, not the dialogue appearing,
+        // is the moment to put the page back.
+        //
+        // Repaint with a rebuild. Recreating the page via
+        // createStartUpPageContainer was tried as a way to reset the wedged
+        // image channel and is not available: the host rejects the second call
+        // with `invalid` after blocking for ~2s, during which the busy guard
+        // discards every input event.
+        appendEventLog('Lifecycle: exit dialogue cancelled, repainting')
+        exitDialogPending = false
+        return showScreen()
+      }
+    }
+
     if (sysType === OsEventTypeList.FOREGROUND_ENTER_EVENT) {
       appendEventLog('Lifecycle: foreground enter')
       return onForegroundEnter()
@@ -61,6 +126,7 @@ function dispatch(event: EvenHubEvent): Promise<void> | void {
       sysType === OsEventTypeList.SYSTEM_EXIT_EVENT
     ) {
       appendEventLog(`Lifecycle: ${sysType === OsEventTypeList.ABNORMAL_EXIT_EVENT ? 'abnormal' : 'system'} exit`)
+      exitDialogPending = false
       onAppExit()
       return
     }
@@ -116,6 +182,9 @@ function dispatch(event: EvenHubEvent): Promise<void> | void {
       // invokes the system exit dialog. Don't tear down yet — the user
       // can still cancel; teardown happens in the ABNORMAL/SYSTEM exit
       // handlers above if they confirm.
+      // Armed synchronously: the host's FOREGROUND_ENTER for the dialogue
+      // arrives ~100ms later and must be read as "page cleared", not "resumed".
+      exitDialogPending = true
       void getBridge()?.shutDownPageContainer(1)
       return
     }
@@ -123,11 +192,17 @@ function dispatch(event: EvenHubEvent): Promise<void> | void {
 }
 
 export function onEvenHubEvent(event: EvenHubEvent): void {
+  // Event kind is included because a dropped-input problem is indistinguishable
+  // from a dispatch bug without it.
+  const kind = event.textEvent ? `text:${event.textEvent.eventType ?? 0}`
+    : event.listEvent ? `list:${event.listEvent.eventType ?? 0}`
+    : event.sysEvent ? `sys:${event.sysEvent.eventType ?? 0}`
+    : 'other'
   if (processing) {
-    debugLog(`Event dropped (busy) screen=${state.screen} modal=${state.modal ?? '-'}`)
+    debugLog(`Event ${kind} DROPPED (busy) screen=${state.screen}`)
     return
   }
-  debugLog(`Event screen=${state.screen} modal=${state.modal ?? '-'}`)
+  debugLog(`Event ${kind} screen=${state.screen} modal=${state.modal ?? '-'}`)
 
   const result = dispatch(event)
   if (result instanceof Promise) {

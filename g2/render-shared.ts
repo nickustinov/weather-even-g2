@@ -57,16 +57,21 @@ export async function rebuildPage(config: {
   const started = performance.now()
 
   if (!state.startupRendered) {
+    // Latched regardless of the result: createStartUpPageContainer is one-shot
+    // per session, and a second call is rejected with `invalid` after blocking
+    // for ~2s — during which the event dispatcher's busy guard discards every
+    // input. Retrying a failed startup therefore produces a permanent stall,
+    // so the flag records "the one call has been spent", not "it worked".
     const result = await b.createStartUpPageContainer(new CreateStartUpPageContainer(config))
-    const ok = result === StartUpPageCreateResult.success
-    // Only latch on success. Setting this unconditionally meant a failed
-    // startup permanently routed every later render down the rebuild path,
-    // against a page that had never been created.
-    state.startupRendered = ok
-    if (!ok) state.activeContainerIds = new Set()
+    state.startupRendered = true
     // Startup happens once per session and a failure explains everything that
     // follows, so this one is always logged.
     appendEventLog(`Page startup -> ${String(result)} in ${Math.round(performance.now() - started)}ms`)
+    if (result !== StartUpPageCreateResult.success) {
+      // Nothing was created; fall through to rebuilds, which is the only
+      // remaining route and sometimes recovers.
+      state.activeContainerIds = new Set()
+    }
     return
   }
 
