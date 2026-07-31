@@ -76,7 +76,9 @@
     "unit_km": "km",
     "minutes": "{m}m",
     "hours_minutes": "{h}h {m}m",
-    "location_unavailable": "location unavailable"
+    "location_unavailable": "location unavailable",
+    "polar_day": "sun does not set today",
+    "polar_night": "sun does not rise today"
   },
   "wmo_long": {
     "clear": "clear sky",

@@ -114,6 +114,16 @@ export type WeatherData = {
   pressure: number
   sunrise: string
   sunset: string
+  // Minutes of daylight, taken from Open-Meteo's daylight_duration rather than
+  // derived from sunset minus sunrise. Above the Arctic circle the sun can rise
+  // one day and set on the next, which makes that subtraction negative, and
+  // during polar day the API reports 00:00 -> 00:00 which makes it zero.
+  daylightMinutes: number
+  // Sun is up for the whole day (polar day) — sunrise/sunset carry no useful
+  // clock time and must not be shown as 00:00.
+  polarDay: boolean
+  // Sun never rises (polar night).
+  polarNight: boolean
   hourly: HourlyPoint[]
   daily: DailyPoint[]
   airQuality: AirQuality | null

@@ -262,31 +262,67 @@ export function displayTime(hhmm: string, compact = false): string {
 }
 
 export function formatHm(mins: number): string {
-  const h = Math.floor(mins / 60)
-  const m = mins % 60
+  // Clamped because Math.floor and % both misbehave on negatives: -132 minutes
+  // formatted as "-3h -12m". Callers should not pass negatives, but a duration
+  // is never legitimately below zero, so absorb it here too.
+  const total = Math.max(0, Math.round(mins))
+  const h = Math.floor(total / 60)
+  const m = total % 60
   if (h === 0) return t('glasses.minutes', { m })
   return t('glasses.hours_minutes', { h, m })
 }
 
+// Minutes from sunrise to sunset, treating a sunset earlier on the clock than
+// the sunrise as belonging to the next day. Only used where the API's
+// daylight_duration isn't to hand; prefer WeatherData.daylightMinutes.
+function spanMinutes(fromHm: string, toHm: string): number {
+  const from = timeToMinutes(fromHm)
+  const to = timeToMinutes(toHm)
+  return to >= from ? to - from : to + 24 * 60 - from
+}
+
+// Minutes since sunrise, or null when the sun has not risen yet.
+//
+// Naively wrapping a negative offset into the previous day is wrong: at 05:00
+// with a 06:37 sunrise it reports 22h elapsed rather than "not yet risen". The
+// two cases are only distinguishable via the sunset: early-morning hours belong
+// to the previous day's daylight period *only* when that period runs past
+// midnight and we are still before its sunset.
+function elapsedSinceSunrise(sunrise: string, sunset: string, nowMin: number): number | null {
+  const sunMin = timeToMinutes(sunrise)
+  const setMin = timeToMinutes(sunset)
+  const crossesMidnight = setMin < sunMin
+
+  if (crossesMidnight && nowMin <= setMin) return nowMin + 24 * 60 - sunMin
+  if (nowMin < sunMin) return null
+  return nowMin - sunMin
+}
+
+// Fraction of the daylight period elapsed. Handles a sunset falling after
+// midnight, which previously read as "no daylight" (`setMin <= sunMin`) and
+// pinned the bar at 0 all day.
 export function dayProgress(sunrise: string, sunset: string): number {
   const now = new Date()
   const nowMin = now.getHours() * 60 + now.getMinutes()
-  const sunMin = timeToMinutes(sunrise)
-  const setMin = timeToMinutes(sunset)
-  if (setMin <= sunMin) return 0
-  if (nowMin <= sunMin) return 0
-  if (nowMin >= setMin) return 1
-  return (nowMin - sunMin) / (setMin - sunMin)
+  const total = spanMinutes(sunrise, sunset)
+  if (total <= 0) return 0
+
+  const elapsed = elapsedSinceSunrise(sunrise, sunset, nowMin)
+  if (elapsed === null) return 0
+  if (elapsed >= total) return 1
+  return elapsed / total
 }
 
 export function daylightRemaining(sunrise: string, sunset: string): string {
   const now = new Date()
   const nowMin = now.getHours() * 60 + now.getMinutes()
-  const sunMin = timeToMinutes(sunrise)
-  const setMin = timeToMinutes(sunset)
-  if (nowMin < sunMin) return formatHm(setMin - sunMin)
-  if (nowMin >= setMin) return formatHm(0)
-  return formatHm(setMin - nowMin)
+  const total = spanMinutes(sunrise, sunset)
+
+  const elapsed = elapsedSinceSunrise(sunrise, sunset, nowMin)
+  // Not risen yet — the whole daylight period is still ahead.
+  if (elapsed === null) return formatHm(total)
+  if (elapsed >= total) return formatHm(0)
+  return formatHm(total - elapsed)
 }
 
 // ---------------------------------------------------------------------------

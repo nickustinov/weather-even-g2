@@ -730,6 +730,7 @@ type OpenMeteoForecast = {
     sunshine_duration?: number[]
     sunrise?: string[]
     sunset?: string[]
+    daylight_duration?: number[]
   }
 }
 
@@ -741,7 +742,7 @@ export async function fetchWeather(city: City, prefs: UnitPrefs = DEFAULT_UNIT_P
       'temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,surface_pressure,is_day,cloud_cover',
     hourly: 'temperature_2m,weather_code,precipitation_probability,precipitation,wind_speed_10m,wind_direction_10m,wind_gusts_10m,relative_humidity_2m,dew_point_2m,uv_index,surface_pressure,is_day,cloud_cover',
     daily:
-      'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,wind_speed_10m_max,uv_index_max,sunshine_duration,sunrise,sunset',
+      'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,wind_speed_10m_max,uv_index_max,sunshine_duration,sunrise,sunset,daylight_duration',
     timezone: 'auto',
     forecast_days: '10',
     temperature_unit: prefs.temp === 'F' ? 'fahrenheit' : 'celsius',
@@ -799,6 +800,23 @@ export async function fetchWeather(city: City, prefs: UnitPrefs = DEFAULT_UNIT_P
   const sunriseToday = daily.sunrise?.[0] ?? ''
   const sunsetToday = daily.sunset?.[0] ?? ''
 
+  // Open-Meteo gives daylight length directly; deriving it from the two clock
+  // strings breaks north of the Arctic circle. Two shapes to handle:
+  //   cross-midnight — sunrise 02:20, sunset 00:08 on the FOLLOWING date, so
+  //     `sunset - sunrise` is negative (this printed "-3h -12m")
+  //   polar day      — sunrise and sunset both 00:00 a day apart, so the same
+  //     subtraction yields 0 despite 24h of daylight
+  // Verified encodings: Longyearbyen in June reports 00:00 -> 00:00 with
+  // 86400s, McMurdo reports 00:00 -> 00:00 with 0s. So the two extremes are
+  // distinguishable only by the duration, not by the timestamps.
+  const daylightSeconds = daily.daylight_duration?.[0]
+  const hasDaylight = typeof daylightSeconds === 'number'
+  const daylightMinutes = hasDaylight ? Math.round(daylightSeconds / 60) : 0
+  // Gated on the field being present: absent would otherwise read as 0 and
+  // report polar night everywhere.
+  const polarDay = hasDaylight && daylightMinutes >= 24 * 60 - 1
+  const polarNight = hasDaylight && daylightMinutes <= 0
+
   // Air-quality is a separate endpoint that can fail independently; we don't
   // want a flaky AQ response to kill the whole weather refresh.
   const airQuality = await fetchAirQuality(city).catch((err) => {
@@ -820,6 +838,9 @@ export async function fetchWeather(city: City, prefs: UnitPrefs = DEFAULT_UNIT_P
     pressure: Math.round(current.surface_pressure ?? 0),
     sunrise: sunriseToday ? formatTime(sunriseToday) : '',
     sunset: sunsetToday ? formatTime(sunsetToday) : '',
+    daylightMinutes,
+    polarDay,
+    polarNight,
     hourly: hourlyPoints,
     daily: dailyPoints,
     airQuality,

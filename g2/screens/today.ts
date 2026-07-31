@@ -128,7 +128,11 @@ function todayHeader(w: WeatherData): string {
 
 function todayRangeAndDaylight(today: WeatherData['daily'][number], w: WeatherData): string {
   const range = `↑ ${today.tempMax}°    ↓ ${today.tempMin}°`
-  const daylight = t('glasses.daylight_left', { value: daylightRemaining(w.sunrise, w.sunset) })
+  // "0m of daylight left" is misleading during polar day, and there is no
+  // meaningful remaining figure during polar night either.
+  const daylight = w.polarDay ? t('glasses.polar_day')
+    : w.polarNight ? t('glasses.polar_night')
+    : t('glasses.daylight_left', { value: daylightRemaining(w.sunrise, w.sunset) })
   return `${range}\n${daylight}`
 }
 

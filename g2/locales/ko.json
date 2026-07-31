@@ -76,7 +76,9 @@
     "unit_km": "km",
     "minutes": "{m}분",
     "hours_minutes": "{h}시 {m}분",
-    "location_unavailable": "위치를 사용할 수 없음"
+    "location_unavailable": "위치를 사용할 수 없음",
+    "polar_day": "오늘은 해가 지지 않습니다",
+    "polar_night": "오늘은 해가 뜨지 않습니다"
   },
   "wmo_long": {
     "clear": "맑음",

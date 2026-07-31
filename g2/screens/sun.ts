@@ -26,7 +26,6 @@ import {
   formatHm,
   rebuildPage,
   sendImage,
-  timeToMinutes,
   todayDateString,
 } from '../render-shared'
 
@@ -71,10 +70,17 @@ function sunLabels(): string {
 }
 
 function sunValues(w: WeatherData): string {
+  // During polar day/night the API reports 00:00 for both, which would read as
+  // a real sunrise and sunset at midnight.
+  if (w.polarDay || w.polarNight) return ['–', '–'].join('\n')
   return [displayTime(w.sunrise), displayTime(w.sunset)].join('\n')
 }
 
 function sunProgressLine(w: WeatherData): string {
+  // A progress bar through the daylight period is meaningless when there is no
+  // sunrise or sunset to progress between.
+  if (w.polarDay) return '━'.repeat(SUN_BAR_CHARS)
+  if (w.polarNight) return '─'.repeat(SUN_BAR_CHARS)
   const pct = dayProgress(w.sunrise, w.sunset)
   const pos = Math.min(SUN_BAR_CHARS - 1, Math.max(0, Math.round(pct * (SUN_BAR_CHARS - 1))))
   let bar = ''
@@ -87,9 +93,13 @@ function sunProgressLine(w: WeatherData): string {
 }
 
 function dayLengthString(w: WeatherData): string {
-  const length = timeToMinutes(w.sunset) - timeToMinutes(w.sunrise)
+  if (w.polarDay) return t('glasses.polar_day')
+  if (w.polarNight) return t('glasses.polar_night')
+  // daylightMinutes comes from the API. Subtracting the two clock strings goes
+  // negative whenever the sun sets after midnight, which is what produced
+  // "-3h -12m day" above the Arctic circle.
   return t('glasses.day_length', {
-    length: formatHm(length),
+    length: formatHm(w.daylightMinutes),
     remaining: daylightRemaining(w.sunrise, w.sunset),
   })
 }

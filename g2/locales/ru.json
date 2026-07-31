@@ -76,7 +76,9 @@
     "unit_km": "км",
     "minutes": "{m}м",
     "hours_minutes": "{h}ч {m}м",
-    "location_unavailable": "местоположение недоступно"
+    "location_unavailable": "местоположение недоступно",
+    "polar_day": "солнце сегодня не заходит",
+    "polar_night": "солнце сегодня не восходит"
   },
   "wmo_long": {
     "clear": "ясно",

@@ -76,7 +76,9 @@
     "unit_km": "km",
     "minutes": "{m}分",
     "hours_minutes": "{h}时{m}分",
-    "location_unavailable": "无法获取位置"
+    "location_unavailable": "无法获取位置",
+    "polar_day": "今天太阳不落山",
+    "polar_night": "今天太阳不升起"
   },
   "wmo_long": {
     "clear": "晴朗",

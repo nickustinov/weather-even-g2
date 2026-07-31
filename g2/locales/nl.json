@@ -76,7 +76,9 @@
     "unit_km": "km",
     "minutes": "{m}m",
     "hours_minutes": "{h}u {m}m",
-    "location_unavailable": "locatie niet beschikbaar"
+    "location_unavailable": "locatie niet beschikbaar",
+    "polar_day": "zon gaat vandaag niet onder",
+    "polar_night": "zon komt vandaag niet op"
   },
   "wmo_long": {
     "clear": "heldere hemel",

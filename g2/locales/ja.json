@@ -76,7 +76,9 @@
     "unit_km": "km",
     "minutes": "{m}分",
     "hours_minutes": "{h}時 {m}分",
-    "location_unavailable": "位置情報を取得できません"
+    "location_unavailable": "位置情報を取得できません",
+    "polar_day": "今日は日が沈みません",
+    "polar_night": "今日は日が昇りません"
   },
   "wmo_long": {
     "clear": "快晴",
